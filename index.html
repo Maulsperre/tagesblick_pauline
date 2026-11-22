@@ -101,7 +101,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-2); 
 .wm .ers i { font-style: normal; }
 .wm i.ex { font-style: normal; margin-left: .04em; }
 html.v-pauline [data-id="post"], html.v-pauline [data-id="melden"], html.v-pauline #shopBtn, html.v-pauline #ideenBtn, html.v-pauline #lGmail, html.v-pauline #lKal,
-html.v-pauline #srcBtn, html.v-pauline #zrFoto, html.v-pauline #menuHelp, html.v-pauline #foot { display: none !important; }
+html.v-pauline #srcBtn, html.v-pauline #menuHelp, html.v-pauline #foot { display: none !important; }
 .wm .ers:last-of-type { margin-left: .14em; }
 .wm .alt { display: inline-block; transform: translateY(.36em) rotate(24deg); transform-origin: 50% 50%; opacity: .38; font-size: .9em; animation: wmfall 1.1s cubic-bezier(.45,0,.9,.55) .5s both; }
 .wm .ers:last-of-type .alt { animation-delay: .85s; }
@@ -1736,9 +1736,10 @@ window.tagesblickInit = function () {
       })).then(function (r) {
         var bad = 0;
         r.forEach(function (x) { if (x && x !== 'gross') files.push(x); else bad++; });
-        if (files.length > 10) { files = files.slice(0, 10); bad++; }
+        var MAXF = V ? 3 : 10;
+        if (files.length > MAXF) { files = files.slice(0, MAXF); bad++; }
         sending = false; $('zrSend').disabled = false;
-        showFiles(); msg(bad ? 'Nicht alles ließ sich anhängen (nur Bilder und PDFs bis 20 MB, höchstens 10).' : '');
+        showFiles(); msg(bad ? 'Nicht alles ließ sich anhängen (nur Bilder und PDFs bis 20 MB, höchstens ' + MAXF + ').' : '');
       });
     });
     $('zrFiles').addEventListener('click', function (ev) {
@@ -1762,7 +1763,7 @@ window.tagesblickInit = function () {
       var io = window.TB_ZR_IO;
       if (!io || !io.upload) { msg('Fotos gehen nur aus der angemeldeten App (Handy oder die Seite im Netz).'); return; }
       sending = true; $('zrSend').disabled = true; msg('Lade ' + files.length + (files.length > 1 ? ' Anhänge' : ' Anhang') + ' hoch …');
-      var namen = files.map(function (f, i) { return 'zuruf_anhaenge/' + m.id + '_' + (i + 1) + '.' + f.ext; });
+      var namen = files.map(function (f, i) { return (V ? 'zuruf_anhaenge_pauline/' : 'zuruf_anhaenge/') + m.id + '_' + (i + 1) + '.' + f.ext; });
       Promise.all(files.map(function (f, i) { return io.upload(namen[i], f.blob); }))
         .then(function () { m.anhaenge = namen; fertig(); })
         .catch(function () { msg('Hochladen hat nicht geklappt. Die Fotos bleiben ausgewählt, bitte später noch einmal senden.'); })
@@ -1772,7 +1773,7 @@ window.tagesblickInit = function () {
   window.tbZuruf = function (D) {
     if (!$('zrForm')) return;
     P = (D && D.personen) || {};
-    if (V) { $('zrText').placeholder = 'Papa, ich brauche …'; $('zrText').maxLength = 500; }
+    if (V) { $('zrText').placeholder = 'Papa, ich brauche …'; $('zrText').maxLength = 500; $('zrFoto').hidden = !window.TB_FOTO_OK; }
     if (!bound) bind();
     render();
     var io = window.TB_ZR_IO;
@@ -2005,12 +2006,23 @@ window.tagesblickInit = function () {
       var was = (ART[v.art] || ART.nachricht) + (v.text ? ': ' + v.text : '') + (v.datum ? ', ' + v.datum : '') + (v.zeit ? ' um ' + v.zeit : '');
       return '<section class="rep"><h4>' + esc(when(m.zeit)) + '</h4><p><b>„' + esc(m.text) + '“</b></p><p>Vorschlag: ' + esc(was) + '</p>' +
         (m.hinweis ? '<p><i>' + esc(m.hinweis) + '</i></p>' : '') +
+        (m.anhaenge && m.anhaenge.length ? '<div class="zr-files">' + m.anhaenge.map(function (n) { return '<a class="zr-file" data-foto="' + esc(n) + '" target="_blank" rel="noopener">…</a>'; }).join('') + '</div><p class="zr-msg">Foto von Pauline. Schau es dir selbst an: Claude öffnet es nicht von allein.</p>' : '') +
         '<label class="zr-msg">Auftrag an Claude (ergänzen oder ändern):</label><textarea rows="3" data-ta="' + esc(m.id) + '" style="width:100%;box-sizing:border-box">' + esc('Pauline schreibt: „' + m.text + '“. ') + '</textarea>' +
         '<div class="zr-act"><button class="btn zr-send" type="button" data-ok="' + esc(m.id) + '">Übernehmen</button><button class="btn zr-send" type="button" data-fw="' + esc(m.id) + '">An Claude schicken</button><button class="btn" type="button" data-no="' + esc(m.id) + '">Ablehnen</button></div></section>';
-    }).join(''); }
+    }).join(''); fotos(); }
     var neu = o.filter(function (m) { return !weg[m.id]; });
     if (!o.length) { if (dlg.open) dlg.close(); return; }
     if (neu.length && !dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); }
+  }
+  var urls = {};
+  function fotos() {
+    var io = window.TB_PAU_IO; if (!io || !io.foto) return;
+    [].forEach.call($('pauList').querySelectorAll('[data-foto]'), function (a) {
+      var n = a.getAttribute('data-foto'), pdf = /\.pdf$/i.test(n);
+      function show(u) { a.href = u; a.textContent = ''; if (pdf) a.innerHTML = '📄<br>PDF'; else { var im = document.createElement('img'); im.src = u; im.alt = ''; a.appendChild(im); } }
+      if (urls[n]) { show(urls[n]); return; }
+      io.foto(n).then(function (b) { urls[n] = URL.createObjectURL(b); show(urls[n]); }).catch(function () { a.textContent = '?'; });
+    });
   }
   function load() {
     var io = window.TB_PAU_IO; if (!io) return;
@@ -2028,6 +2040,7 @@ window.tagesblickInit = function () {
     }).then(function (l) {
       list = l;
       var v = m0.vorschlag || {};
+      if (changed && io.dropFoto) io.dropFoto(m0.anhaenge);
       if (changed && ok && v.art === 'einkauf' && window.tbShopAdd) window.tbShopAdd(v.text || m0.text);
       paint();
     }).catch(function () { $('pauList').insertAdjacentHTML('beforeend', '<p class="zr-msg">OneDrive nicht erreichbar. Bitte später noch einmal versuchen.</p>'); });
@@ -2037,7 +2050,8 @@ window.tagesblickInit = function () {
     var io = window.TB_PAU_IO, zr = window.TB_ZR_IO, ta = null;
     [].forEach.call($('pauList').querySelectorAll('textarea'), function (t) { if (t.getAttribute('data-ta') === id) ta = t; });
     if (!io || !zr || !ta || !ta.value.trim()) return;
-    var text = ta.value.trim(), changed = false;
+    var text = ta.value.trim(), changed = false, orig = list.filter(function (m) { return m.id === id; })[0] || {};
+    var an = (orig.anhaenge || []).filter(function (n) { return /^zuruf_anhaenge_pauline\/[\w-]+\.(jpg|jpeg|png|webp|pdf)$/i.test(n); });
     io.apply(function (o) {
       o.nachrichten.forEach(function (m) {
         if (m.id !== id || m.status !== 'vorgeschlagen') return;
@@ -2047,7 +2061,10 @@ window.tagesblickInit = function () {
       list = l; lastSig = null;
       if (!changed) { paint(); return; }
       var z = { id: 'z' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), zeit: new Date().toISOString(), text: text, status: 'offen', quelle: 'pauline', paulineId: id };
-      return zr.push([z]).then(function () { paint(); if (window.tbZuruf) window.tbZuruf(window.TAGESBLICK); });
+      return Promise.all(an.map(function (n, i) {
+        return io.foto(n).then(function (b) { var nn = 'zuruf_anhaenge/' + z.id + '_' + (i + 1) + '.' + n.split('.').pop().toLowerCase(); return zr.upload(nn, b).then(function () { return nn; }); });
+      })).then(function (names) { if (names.length) z.anhaenge = names; return zr.push([z]); })
+        .then(function () { if (io.dropFoto) io.dropFoto(an); paint(); if (window.tbZuruf) window.tbZuruf(window.TAGESBLICK); });
     }).catch(function () { $('pauList').insertAdjacentHTML('beforeend', '<p class="zr-msg">Hat nicht geklappt. Bitte später noch einmal versuchen oder den Text selbst als Zuruf senden.</p>'); });
   }
   function bind() {
@@ -2207,9 +2224,10 @@ window.tagesblickInit = function () {
 
   var SH = {};
   if (V) {
-    var qp = new URLSearchParams(location.search), sd = qp.get('daten'), sp = qp.get('post');
-    if (sd || sp) { var o0 = {}; try { o0 = JSON.parse(ls(SHKEY) || '{}') || {}; } catch (e) {} if (sd) o0.daten = sd; if (sp) o0.post = sp; ls(SHKEY, JSON.stringify(o0)); }
+    var qp = new URLSearchParams(location.search), sd = qp.get('daten'), sp = qp.get('post'), sf = qp.get('foto');
+    if (sd || sp || sf) { var o0 = {}; try { o0 = JSON.parse(ls(SHKEY) || '{}') || {}; } catch (e) {} if (sd) o0.daten = sd; if (sp) o0.post = sp; if (sf) o0.foto = sf; ls(SHKEY, JSON.stringify(o0)); }
     try { SH = JSON.parse(ls(SHKEY) || '{}') || {}; } catch (e) {}
+    window.TB_FOTO_OK = !!SH.foto;
   }
   var client = new URLSearchParams(location.search).get('client');
   if (client) { ls(KEY, client); history.replaceState(null, '', location.pathname); }
@@ -2254,7 +2272,11 @@ window.tagesblickInit = function () {
       var RES = {};
       function shareId(link) { return 'u!' + btoa(unescape(encodeURIComponent(link))).replace(/=+$/, '').replace(/\//g, '_').replace(/\+/g, '-'); }
       function url(name) {
-        if (V) { if (!RES[name]) throw new Error('nicht freigegeben'); return RES[name]; }
+        if (V) {
+          var fm = /^zuruf_anhaenge_pauline\/([\w-]+\.(?:jpg|jpeg|png|webp|pdf))$/i.exec(name);
+          if (fm) { if (!RES.foto) throw new Error('Fotos nicht freigegeben'); return RES.foto + ':/' + fm[1] + ':/content'; }
+          if (!RES[name]) throw new Error('nicht freigegeben'); return RES[name];
+        }
         return 'https://graph.microsoft.com/v1.0/me/drive/root:/' + ordner + name + ':/content';
       }
       /* Freigabelinks in feste Adressen auflösen (Laufwerk und Datei) */
@@ -2265,7 +2287,9 @@ window.tagesblickInit = function () {
           return fetch('https://graph.microsoft.com/v1.0/shares/' + shareId(j[1]) + '/driveItem?$select=id,parentReference', { headers: { Authorization: 'Bearer ' + tok } })
             .then(function (r) { if (!r.ok) throw new Error('Freigabe nicht lesbar (HTTP ' + r.status + ')'); return r.json(); })
             .then(function (it) { RES[j[0]] = 'https://graph.microsoft.com/v1.0/drives/' + it.parentReference.driveId + '/items/' + it.id + '/content'; });
-        }));
+        }).concat(SH.foto ? [fetch('https://graph.microsoft.com/v1.0/shares/' + shareId(SH.foto) + '/driveItem?$select=id,parentReference', { headers: { Authorization: 'Bearer ' + tok } })
+          .then(function (r) { if (!r.ok) throw new Error('Foto-Ordner nicht lesbar (HTTP ' + r.status + ')'); return r.json(); })
+          .then(function (it) { RES.foto = 'https://graph.microsoft.com/v1.0/drives/' + it.parentReference.driveId + '/items/' + it.id; })] : []));
       }
       function lade(tok, i) {
         ordner = ORDNER[i];
@@ -2351,7 +2375,7 @@ window.tagesblickInit = function () {
         },
         /* Anhänge eines gelöschten Zurufs entfernen (Fehler werden ignoriert) */
         drop: function (namen) {
-          if (!namen || !namen.length) return;
+          if (V || !namen || !namen.length) return;
           token().then(function (tok) {
             namen.forEach(function (n) {
               if (!/^zuruf_anhaenge\/[\w.-]+$/.test(n)) return;
@@ -2367,7 +2391,21 @@ window.tagesblickInit = function () {
           .then(function (r) { if (r.status === 404) return { nachrichten: [] }; if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
           .then(function (o) { if (!o || !Array.isArray(o.nachrichten)) o = { nachrichten: [] }; return o; });
       }
+      var PFOTO = /^zuruf_anhaenge_pauline\/[\w-]+\.(jpg|jpeg|png|webp|pdf)$/i;
       if (!V) window.TB_PAU_IO = {
+        /* Foto oder PDF von Pauline als Datei laden (nur aus ihrem Ordner, nur feste Endungen) */
+        foto: function (name) {
+          if (!PFOTO.test(name)) return Promise.reject(new Error('Name'));
+          return token().then(function (tok) { return fetch('https://graph.microsoft.com/v1.0/me/drive/root:/' + ordner + name + ':/content', { headers: { Authorization: 'Bearer ' + tok } }); })
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+            .then(function (b) { var pdf = /\.pdf$/i.test(name); return new Blob([b], { type: pdf ? 'application/pdf' : (/\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : 'image/jpeg') }); });
+        },
+        dropFoto: function (namen) {
+          (namen || []).forEach(function (n) {
+            if (!PFOTO.test(n)) return;
+            token().then(function (tok) { fetch('https://graph.microsoft.com/v1.0/me/drive/root:/' + ordner + n, { method: 'DELETE', headers: { Authorization: 'Bearer ' + tok } }).catch(function () {}); }).catch(function () {});
+          });
+        },
         load: function () { return token().then(ladePau).then(function (o) { return o.nachrichten; }); },
         apply: function (fn) {
           var p = pauLauf.then(function () {
