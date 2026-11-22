@@ -1772,7 +1772,7 @@ window.tagesblickInit = function () {
   window.tbZuruf = function (D) {
     if (!$('zrForm')) return;
     P = (D && D.personen) || {};
-    if (V) { $('zrText').placeholder = 'Papa, ich brauche …'; }
+    if (V) { $('zrText').placeholder = 'Papa, ich brauche …'; $('zrText').maxLength = 500; }
     if (!bound) bind();
     render();
     var io = window.TB_ZR_IO;
@@ -1991,7 +1991,7 @@ window.tagesblickInit = function () {
    Der Text von Pauline wird nur angezeigt, nie als Anweisung ausgeführt. */
 (function () {
   if (window.TB_VARIANT === 'pauline') return;
-  var list = [], weg = {}, bound = false;
+  var list = [], weg = {}, bound = false, lastSig = null;
   var ART = { einkauf: 'Auf die Einkaufsliste', aufgabe: 'Als Aufgabe', erinnerung: 'Als Erinnerung', termin: 'Als Termin', nachricht: 'Nur zur Kenntnis' };
   function $(id) { return document.getElementById(id); }
   function esc(x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -1999,13 +1999,15 @@ window.tagesblickInit = function () {
   function offen() { return list.filter(function (m) { return m.status === 'vorgeschlagen'; }); }
   function paint() {
     var o = offen(), box = $('pauList'), dlg = $('pauPop');
-    box.innerHTML = o.map(function (m) {
+    var sig = o.map(function (m) { return m.id; }).join(',');
+    if (sig !== lastSig) { lastSig = sig; box.innerHTML = o.map(function (m) {
       var v = m.vorschlag || { art: 'nachricht' };
       var was = (ART[v.art] || ART.nachricht) + (v.text ? ': ' + v.text : '') + (v.datum ? ', ' + v.datum : '') + (v.zeit ? ' um ' + v.zeit : '');
       return '<section class="rep"><h4>' + esc(when(m.zeit)) + '</h4><p><b>„' + esc(m.text) + '“</b></p><p>Vorschlag: ' + esc(was) + '</p>' +
         (m.hinweis ? '<p><i>' + esc(m.hinweis) + '</i></p>' : '') +
-        '<div class="zr-act"><button class="btn zr-send" type="button" data-ok="' + esc(m.id) + '">Übernehmen</button><button class="btn" type="button" data-no="' + esc(m.id) + '">Ablehnen</button></div></section>';
-    }).join('');
+        '<label class="zr-msg">Auftrag an Claude (ergänzen oder ändern):</label><textarea rows="3" data-ta="' + esc(m.id) + '" style="width:100%;box-sizing:border-box">' + esc('Pauline schreibt: „' + m.text + '“. ') + '</textarea>' +
+        '<div class="zr-act"><button class="btn zr-send" type="button" data-ok="' + esc(m.id) + '">Übernehmen</button><button class="btn zr-send" type="button" data-fw="' + esc(m.id) + '">An Claude schicken</button><button class="btn" type="button" data-no="' + esc(m.id) + '">Ablehnen</button></div></section>';
+    }).join(''); }
     var neu = o.filter(function (m) { return !weg[m.id]; });
     if (!o.length) { if (dlg.open) dlg.close(); return; }
     if (neu.length && !dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); }
@@ -2030,11 +2032,31 @@ window.tagesblickInit = function () {
       paint();
     }).catch(function () { $('pauList').insertAdjacentHTML('beforeend', '<p class="zr-msg">OneDrive nicht erreichbar. Bitte später noch einmal versuchen.</p>'); });
   }
+  /* Text ergänzen und als Zuruf an Claude weiterreichen. Der Zuruf trägt quelle "pauline", Claude führt ihn nur eingeschränkt aus. */
+  function forward(id) {
+    var io = window.TB_PAU_IO, zr = window.TB_ZR_IO, ta = null;
+    [].forEach.call($('pauList').querySelectorAll('textarea'), function (t) { if (t.getAttribute('data-ta') === id) ta = t; });
+    if (!io || !zr || !ta || !ta.value.trim()) return;
+    var text = ta.value.trim(), changed = false;
+    io.apply(function (o) {
+      o.nachrichten.forEach(function (m) {
+        if (m.id !== id || m.status !== 'vorgeschlagen') return;
+        changed = true; m.status = 'uebernommen'; m.weitergeleitet = true; m.entschieden = new Date().toISOString(); m.bearbeitet = m.entschieden; m.antwort = 'Papa hat es übernommen.';
+      });
+    }).then(function (l) {
+      list = l; lastSig = null;
+      if (!changed) { paint(); return; }
+      var z = { id: 'z' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), zeit: new Date().toISOString(), text: text, status: 'offen', quelle: 'pauline', paulineId: id };
+      return zr.push([z]).then(function () { paint(); if (window.tbZuruf) window.tbZuruf(window.TAGESBLICK); });
+    }).catch(function () { $('pauList').insertAdjacentHTML('beforeend', '<p class="zr-msg">Hat nicht geklappt. Bitte später noch einmal versuchen oder den Text selbst als Zuruf senden.</p>'); });
+  }
   function bind() {
     bound = true;
     var dlg = $('pauPop');
     dlg.addEventListener('click', function (ev) {
       var ok = ev.target.closest('[data-ok]'), no = ev.target.closest('[data-no]');
+      var fw = ev.target.closest('[data-fw]');
+      if (fw) { forward(fw.getAttribute('data-fw')); return; }
       if (ok) { decide(ok.getAttribute('data-ok'), true); return; }
       if (no) { decide(no.getAttribute('data-no'), false); return; }
       var r = dlg.getBoundingClientRect();
