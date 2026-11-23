@@ -147,6 +147,8 @@ html.handy .menu .mi { padding: 14px; font-size: 16px; }
 .reload:active svg { transform: rotate(180deg); }
 html.handy .reload { width: 42px; height: 42px; }
 .clock { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; flex: 1 1 320px; min-width: 0; }
+.reptop { align-self: center; font: inherit; font-family: var(--mono); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); cursor: pointer; }
+.reptop:hover, .reptop:focus-visible { background: color-mix(in srgb, var(--accent) 22%, transparent); outline: none; }
 .nextwhen { margin-left: auto; align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
 .nextwhen .nw-l { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .nextwhen .nw-t { font-family: var(--display); font-weight: 700; font-size: 22px; line-height: 1.1; color: var(--accent); font-variant-numeric: tabular-nums; }
@@ -736,7 +738,7 @@ html[data-theme="ueberraschung"] .editbtn:hover, html[data-theme="ueberraschung"
 
   <div class="main">
     <div class="hud">
-      <div class="clock"><span id="clock">--:--</span><span class="date" id="date"></span><span class="nextwhen" id="nextWhen" hidden></span></div>
+      <div class="clock"><span id="clock">--:--</span><button class="reptop" type="button" id="repBtn" title="Report: dein Tag in Worten">🗣 Report</button><span class="date" id="date"></span><span class="nextwhen" id="nextWhen" hidden></span></div>
       <div class="chips">
         <span class="chip" id="open"></span>
         <span class="chip akut" id="akut"></span>
@@ -745,7 +747,6 @@ html[data-theme="ueberraschung"] .editbtn:hover, html[data-theme="ueberraschung"
         <button class="chip link shopbtn" type="button" id="shopBtn">🛒 Einkauf</button>
         <button class="chip link shopbtn" type="button" id="ideenBtn">💡 Ideen</button>
         <button class="chip link shopbtn" type="button" id="bibBtn">📚 Bibliothek</button>
-        <button class="chip link shopbtn" type="button" id="repBtn">🗣 Report</button>
         <button class="chip link setsrc" type="button" id="srcBtn">Datenquelle</button>
         <span class="seg" role="group" aria-label="Ansicht der nächsten 14 Tage" hidden>
           <button type="button" id="vZeit" aria-pressed="true">Zeitleiste</button>
