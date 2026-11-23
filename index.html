@@ -511,8 +511,8 @@ select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
 .item.lvl3 .title { font-weight: 700; }
 /* Langsames Atmen (4 s, weich ein und aus), kein Blinken. Aus bei "Bewegung reduzieren". */
 @keyframes lvl3Atmen { 0%, 100% { border-color: color-mix(in srgb, var(--akut) 45%, transparent); background-color: color-mix(in srgb, var(--akut) 5%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--akut) 6%, transparent); } 50% { border-color: var(--akut); background-color: color-mix(in srgb, var(--akut) 15%, transparent); box-shadow: 0 0 14px 3px color-mix(in srgb, var(--akut) 32%, transparent); } }
-.item.lvl3:not(.done) { animation: lvl3Atmen 4s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .item.lvl3:not(.done) { animation: none; } }
+.item.lvl3.pulse:not(.done) { animation: lvl3Atmen 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .item.lvl3.pulse:not(.done) { animation: none; } }
 .item.lvl2 { border: 0; border-left: 4px solid var(--bald); border-radius: 6px; padding: 8px 10px; margin: 4px 0; background: color-mix(in srgb, var(--bald) 8%, transparent); }
 .item.done.lvl3, .item.done.lvl2 { border-color: var(--line); background: none; box-shadow: none; }
 #rqD { max-width: min(520px, 94vw); border: 2px solid var(--accent); }
@@ -982,6 +982,7 @@ window.tagesblickInit = function () {
   }
   function byTime(a, b) { return String(a.zeit || '99:99').localeCompare(String(b.zeit || '99:99')); }
   /* Wichtigkeit (1 Irgendwann, 2 Wichtig, 3 Kritisch), Zeitfenster und Schritte */
+  function rang(e) { var r = Number(e.rang); return r >= 1 ? Math.floor(r) : 99; } /* Rang 1 = wichtigste Aufgabe, setzt Markus */
   function wicht(e) { var w = Number(e.wichtig); return w >= 1 && w <= 3 ? Math.floor(w) : 0; }
   function winInfo(e) {
     if (!e.fenster || !ISODATE.test(e.fenster.von || '') || !ISODATE.test(e.fenster.bis || '')) return null;
@@ -1032,7 +1033,7 @@ window.tagesblickInit = function () {
   E.forEach(function (e) { if (e.datum && diff(e.datum) < 0 && !isDone(e) && OVERDUE.indexOf(e.art) >= 0) todayList.push(e); });
   E.forEach(function (e) { if (winInfo(e) && (winShown(e) || (isDone(e) && winInfo(e).state === 'in'))) todayList.push(e); });
   todayList = todayList.filter(function (e, i, a) { return a.indexOf(e) === i && !doneEarlier(e); }).sort(function (a, b) {
-    return byTime(a, b) || Number(!!isUndatedTask(a)) - Number(!!isUndatedTask(b)) ||
+    return byTime(a, b) || (rang(a) - rang(b)) || Number(!!isUndatedTask(a)) - Number(!!isUndatedTask(b)) ||
       (isUndatedTask(a) && isUndatedTask(b) ? (wicht(b) - wicht(a)) || taskAge(b) - taskAge(a) : 0);
   });
   var tomorrowList = E.filter(function (e) { return !isAllDay(e) && occurs(e, 1); }).sort(byTime);
@@ -1085,7 +1086,7 @@ window.tagesblickInit = function () {
     var priority = entryPriority(e);
     var meta = '<span class="kind">' + esc(e.art) + '</span>' + who(e.wer) +
       (opts.count ? abh(e) : (e.bereich ? '<span class="bereich">' + esc(e.bereich) + '</span>' : '') +
-        (wicht(e) === 3 ? '<span class="pill akut">Kritisch</span>' : wicht(e) === 1 ? '<span class="pill info">Irgendwann</span>' : '') + abh(e) + pill(priority) + overdue);
+        (rang(e) < 99 ? '<span class="pill akut rang">Nr. ' + rang(e) + '</span>' : '') + (wicht(e) === 3 ? '<span class="pill akut">Kritisch</span>' : wicht(e) === 1 ? '<span class="pill info">Irgendwann</span>' : '') + abh(e) + pill(priority) + overdue);
     if (isUndatedTask(e)) {
       var wn = wdh(e);
       meta += '<span>' + (wn ? 'Kehrt wieder' : 'Aufgenommen ' + shortDate(diff(e.aufgenommen))) + '</span>';
@@ -1115,7 +1116,8 @@ window.tagesblickInit = function () {
     var lvl = '';
     if (opts.check) {
       var wp = priority && priority.stufe;
-      if (wicht(e) === 3 || (e.pill && /extrem/i.test(e.pill.text || ''))) lvl = ' lvl3';
+      var extrem = !!(e.pill && /extrem/i.test(e.pill.text || ''));
+      if (wicht(e) === 3 || extrem) lvl = ' lvl3' + (extrem || rang(e) <= 3 ? ' pulse' : '');
       else if (wicht(e) === 2 || wp === 'akut') lvl = ' lvl2';
     }
     return '<li class="item' + (done ? ' done' : '') + lvl + '" data-who="' + esc(e.wer) + '">' + when +
