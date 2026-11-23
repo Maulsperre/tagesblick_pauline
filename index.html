@@ -349,6 +349,7 @@ html.handy .shop-cat { font-size: .8em; margin-top: 18px; }
 .zr-file { position: relative; width: 64px; height: 64px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: grid; place-items: center; font-size: .72em; color: var(--muted); background: var(--panel, transparent); text-align: center; }
 .zr-file img { width: 100%; height: 100%; object-fit: cover; }
 .zr-file button { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border: 0; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; cursor: pointer; font-size: 11px; line-height: 20px; padding: 0; }
+.zr-pruef { margin: 4px 0 0; font-size: .85em; color: var(--accent); font-weight: 600; }
 .zr-att { display: inline-block; margin-top: 3px; font-size: .82em; color: var(--accent); }
 html.handy .zr-file { width: 84px; height: 84px; }
 html.handy .zr-file button { width: 28px; height: 28px; line-height: 28px; font-size: 14px; }
@@ -1578,6 +1579,11 @@ window.tagesblickInit = function () {
     var rf = all.filter(function (m) { return m.status === 'rueckfrage'; }).length;
     if ($('zrCount')) $('zrCount').textContent = rf ? rf + ' Rückfrage' + (rf > 1 ? 'n' : '') : offen ? offen + ' offen' : '';
     /* Offene Zurufe bleiben immer sichtbar, bis Claude sie erledigt hat. Erledigte stehen im Verlaufsfenster. */
+    /* Prüfhinweis: Ein Filter liest Fotos und PDFs für Claude und kann sich verlesen. */
+    function pruef(m) {
+      if (V || !((m.anhaenge && m.anhaenge.length) || m.anhaengeGeloescht) || m.status === 'offen' || m.status === 'unterwegs') return '';
+      return '<p class="zr-pruef">⚠ Aus dem Foto gelesen, nicht von Claude selbst gesehen. Bitte Betrag, Frist, Adresse und Namen am Foto selbst prüfen.</p>';
+    }
     var done = all.filter(function (m) { return DONE[m.status]; });
     all = all.filter(function (m) { return !DONE[m.status]; });
     $('zrHistBar').hidden = !done.length;
@@ -1586,13 +1592,13 @@ window.tagesblickInit = function () {
       done.map(function (m, i) {
         return '<section class="rep' + (i === 0 ? ' latest' : '') + '"><h4>' + esc(when(m.zeit)) + (i === 0 ? ' · neuester' : '') + '</h4><p>' + esc(m.text) + '</p>' +
           (m.anhaenge && m.anhaenge.length ? '<p>📷 ' + m.anhaenge.length + (m.anhaenge.length > 1 ? ' Anhänge' : ' Anhang') + '</p>' : '') +
-          (m.antwort ? '<p><i>' + esc(m.antwort) + '</i></p>' : '') + '</section>';
+          (m.antwort ? '<p><i>' + esc(m.antwort) + '</i></p>' : '') + pruef(m) + '</section>';
       }).join('');
     $('zrList').innerHTML = all.map(function (m) {
       var s = STATUS[m.status] || STATUS.offen;
       return '<li><div class="zr-meta"><span class="pill ' + s[0] + '">' + s[1] + '</span><span>' + esc(when(m.zeit)) + '</span></div>' +
         '<p class="zr-t">' + esc(m.text) + '</p>' +
-        (m.anhaenge && m.anhaenge.length ? '<span class="zr-att">📷 ' + m.anhaenge.length + (m.anhaenge.length > 1 ? ' Anhänge' : ' Anhang') + '</span>' : '') + (m.antwort ? '<p class="zr-a">' + esc(m.antwort) + '</p>' : '') +
+        (m.anhaenge && m.anhaenge.length ? '<span class="zr-att">📷 ' + m.anhaenge.length + (m.anhaenge.length > 1 ? ' Anhänge' : ' Anhang') + '</span>' : '') + (m.antwort ? '<p class="zr-a">' + esc(m.antwort) + '</p>' : '') + pruef(m) +
         (m.status === 'rueckfrage' ? '<button class="btn zr-reply" type="button" data-reply="' + esc(m.id) + '">Antworten</button>' : '') +
         (m.status === 'offen' || m.status === 'unterwegs' ? '<div class="zr-tools"><button class="btn" type="button" data-edit="' + esc(m.id) + '">Bearbeiten</button><button class="btn" type="button" data-del="' + esc(m.id) + '">Löschen</button></div>' : '') + '</li>';
     }).join('') || '<li class="empty">' + TXT.leer + '</li>';
@@ -2006,7 +2012,7 @@ window.tagesblickInit = function () {
       var was = (ART[v.art] || ART.nachricht) + (v.text ? ': ' + v.text : '') + (v.datum ? ', ' + v.datum : '') + (v.zeit ? ' um ' + v.zeit : '');
       return '<section class="rep"><h4>' + esc(when(m.zeit)) + '</h4><p><b>„' + esc(m.text) + '“</b></p><p>Vorschlag: ' + esc(was) + '</p>' +
         (m.hinweis ? '<p><i>' + esc(m.hinweis) + '</i></p>' : '') +
-        (m.anhaenge && m.anhaenge.length ? '<div class="zr-files">' + m.anhaenge.map(function (n) { return '<a class="zr-file" data-foto="' + esc(n) + '" target="_blank" rel="noopener">…</a>'; }).join('') + '</div><p class="zr-msg">Foto von Pauline. Schau es dir selbst an: Claude öffnet es nicht von allein.</p>' : '') +
+        (m.anhaenge && m.anhaenge.length ? '<div class="zr-files">' + m.anhaenge.map(function (n) { return '<a class="zr-file" data-foto="' + esc(n) + '" target="_blank" rel="noopener">…</a>'; }).join('') + '</div><p class="zr-msg">Foto von Pauline. Schau es dir selbst an: Claude öffnet es nicht selbst, ein Filter liest es für ihn und kann sich verlesen. Prüf Angaben später am Foto nach.</p>' : '') +
         '<label class="zr-msg">Auftrag an Claude (ergänzen oder ändern):</label><textarea rows="3" data-ta="' + esc(m.id) + '" style="width:100%;box-sizing:border-box">' + esc('Pauline schreibt: „' + m.text + '“. ') + '</textarea>' +
         '<div class="zr-act"><button class="btn zr-send" type="button" data-ok="' + esc(m.id) + '">Übernehmen</button><button class="btn zr-send" type="button" data-fw="' + esc(m.id) + '">An Claude schicken</button><button class="btn" type="button" data-no="' + esc(m.id) + '">Ablehnen</button></div></section>';
     }).join(''); fotos(); }
