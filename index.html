@@ -1065,10 +1065,13 @@ window.tagesblickInit = function () {
 
   /* Abhängigkeit: "abhaengig": {"von": "<id>", "grund": "...", "hart": true}. Verschwindet, sobald die andere Aufgabe erledigt ist. */
   function abh(e) {
-    var a = e.abhaengig; if (!a || !a.von) return '';
-    var o = E.filter(function (x) { return x.id === a.von; })[0];
-    if (o && isDone(o)) return '';
-    return '<span class="pill ' + (a.hart ? 'akut' : 'bald') + '">' + (a.hart ? '⛔ Blockiert durch: ' : '↳ Besser erst: ') + esc(o ? o.titel : a.von) + (a.grund ? ' (' + esc(a.grund) + ')' : '') + '</span>';
+    var arr = Array.isArray(e.abhaengig) ? e.abhaengig : (e.abhaengig ? [e.abhaengig] : []);
+    return arr.map(function (a) {
+      if (!a || !a.von) return '';
+      var o = E.filter(function (x) { return x.id === a.von; })[0];
+      if (o && isDone(o)) return '';
+      return '<span class="pill ' + (a.hart ? 'akut' : 'bald') + '">' + (a.hart ? '⛔ Blockiert durch: ' : '↳ Besser erst: ') + esc(o ? o.titel : a.von) + (a.grund ? ' (' + esc(a.grund) + ')' : '') + '</span>';
+    }).join('');
   }
   function item(e, opts) {
     var when = opts.count ? '<span class="when">' + diff(e.datum) + ' T</span>'
@@ -1076,7 +1079,7 @@ window.tagesblickInit = function () {
     var overdue = opts.check && e.datum && diff(e.datum) < 0 ? '<span class="pill akut">überfällig seit ' + shortDate(diff(e.datum)) + '</span>' : '';
     var priority = entryPriority(e);
     var meta = '<span class="kind">' + esc(e.art) + '</span>' + who(e.wer) +
-      (opts.count ? '' : (e.bereich ? '<span class="bereich">' + esc(e.bereich) + '</span>' : '') +
+      (opts.count ? abh(e) : (e.bereich ? '<span class="bereich">' + esc(e.bereich) + '</span>' : '') +
         (wicht(e) === 3 ? '<span class="pill akut">Kritisch</span>' : wicht(e) === 1 ? '<span class="pill info">Irgendwann</span>' : '') + abh(e) + pill(priority) + overdue);
     if (isUndatedTask(e)) {
       var wn = wdh(e);
