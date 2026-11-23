@@ -1224,19 +1224,20 @@ window.tagesblickInit = function () {
     [].forEach.call(dlg.querySelectorAll('input[name="aufM"]'), function (r) { r.addEventListener('change', sync); });
     $('aufNo').addEventListener('click', close);
     dlg.addEventListener('close', stopMic);
+    if (!SR && $('aufMic')) { $('aufMic').hidden = false; $('aufMic').addEventListener('click', function () { $('aufErr').textContent = window.tbDNo; }); }
     if (SR) {
       var mic = $('aufMic'); mic.hidden = false;
       mic.addEventListener('click', function () {
         if (rec) { rec.stop(); return; }
         var ta = $('aufTxt'), basis = ta.value ? ta.value.replace(/\s*$/, ' ') : '';
-        rec = new SR(); rec.lang = 'de-DE'; rec.continuous = true; rec.interimResults = true;
+        rec = new SR(); rec.lang = 'de-DE'; rec.continuous = !/Android/i.test(navigator.userAgent); rec.interimResults = true;
         rec.onresult = function (ev) {
           var fertig = '', vorl = '';
           for (var i = ev.resultIndex; i < ev.results.length; i++) { if (ev.results[i].isFinal) fertig += ev.results[i][0].transcript; else vorl += ev.results[i][0].transcript; }
           if (fertig) basis += fertig.trim() + ' ';
           ta.value = basis + vorl;
         };
-        rec.onerror = function (ev) { $('aufErr').textContent = ev.error === 'not-allowed' ? 'Mikrofon nicht erlaubt. Bitte im Browser für diese Seite freigeben.' : 'Diktieren unterbrochen (' + ev.error + ').'; };
+        rec.onerror = function (ev) { $('aufErr').textContent = window.tbDErr(ev.error); };
         rec.onend = function () { ta.value = basis.trim(); mic.textContent = '🎤 Diktieren'; mic.setAttribute('aria-pressed', 'false'); rec = null; };
         try { rec.start(); mic.textContent = '■ Stopp'; mic.setAttribute('aria-pressed', 'true'); } catch (e) { rec = null; }
       });
@@ -1901,12 +1902,13 @@ window.tagesblickInit = function () {
     });
     /* Diktieren: Spracherkennung des Browsers (Chrome, Edge), Text wird ans Feld angehängt */
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition, mic = $('zrMic'), rec = null, basis = '';
+    if (!SR) { mic.hidden = false; mic.addEventListener('click', function () { msg(window.tbDNo); }); }
     if (SR) {
       mic.hidden = false;
       var stopMic = function () { mic.classList.remove('on'); mic.setAttribute('aria-pressed', 'false'); mic.textContent = '🎤 Diktieren'; rec = null; };
       mic.addEventListener('click', function () {
         if (rec) { rec.stop(); return; }
-        rec = new SR(); rec.lang = 'de-DE'; rec.continuous = true; rec.interimResults = true;
+        rec = new SR(); rec.lang = 'de-DE'; rec.continuous = !/Android/i.test(navigator.userAgent); rec.interimResults = true;
         var ta = $('zrText'); basis = ta.value ? ta.value.replace(/\s*$/, ' ') : '';
         rec.onresult = function (ev) {
           var fertig = '', vorlaeufig = '';
@@ -1916,7 +1918,7 @@ window.tagesblickInit = function () {
           if (fertig) basis += fertig.trim() + ' ';
           ta.value = basis + vorlaeufig;
         };
-        rec.onerror = function (ev) { msg(ev.error === 'not-allowed' ? 'Mikrofon nicht erlaubt. Bitte im Browser für diese Seite freigeben.' : 'Diktieren unterbrochen (' + ev.error + ').'); };
+        rec.onerror = function (ev) { msg(window.tbDErr(ev.error)); };
         rec.onend = function () { $('zrText').value = basis.trim(); stopMic(); if ($('zrMsg').textContent === 'Ich höre zu …') msg(''); };
         try { rec.start(); mic.classList.add('on'); mic.setAttribute('aria-pressed', 'true'); mic.textContent = '■ Stopp'; msg('Ich höre zu …'); }
         catch (e) { stopMic(); }
@@ -2746,19 +2748,20 @@ window.tagesblickInit = function () {
     var q = get(QK, []); q.push({ id: cur.id, antwort: t.slice(0, 3000), zeit: new Date().toISOString() }); put(QK, q);
     flush(); close(); setTimeout(check, 1500);
   });
+  if (!SR && $('rqMic')) { $('rqMic').hidden = false; $('rqMic').addEventListener('click', function () { $('rqErr').textContent = window.tbDNo; }); }
   if (SR) {
     var mic = $('rqMic'); mic.hidden = false;
     mic.addEventListener('click', function () {
       if (rec) { rec.stop(); return; }
       var ta = $('rqTxt'), basis = ta.value ? ta.value.replace(/\s*$/, ' ') : '';
-      rec = new SR(); rec.lang = 'de-DE'; rec.continuous = true; rec.interimResults = true;
+      rec = new SR(); rec.lang = 'de-DE'; rec.continuous = !/Android/i.test(navigator.userAgent); rec.interimResults = true;
       rec.onresult = function (ev) {
         var fertig = '', vorl = '';
         for (var i = ev.resultIndex; i < ev.results.length; i++) { if (ev.results[i].isFinal) fertig += ev.results[i][0].transcript; else vorl += ev.results[i][0].transcript; }
         if (fertig) basis += fertig.trim() + ' ';
         ta.value = basis + vorl;
       };
-      rec.onerror = function (ev) { $('rqErr').textContent = ev.error === 'not-allowed' ? 'Mikrofon nicht erlaubt. Bitte im Browser für diese Seite freigeben.' : 'Diktieren unterbrochen (' + ev.error + ').'; };
+      rec.onerror = function (ev) { $('rqErr').textContent = window.tbDErr(ev.error); };
       rec.onend = function () { ta.value = basis.trim(); mic.textContent = '🎤 Diktieren'; mic.setAttribute('aria-pressed', 'false'); rec = null; };
       try { rec.start(); mic.textContent = '■ Stopp'; mic.setAttribute('aria-pressed', 'true'); } catch (e) { rec = null; }
     });
@@ -2781,6 +2784,16 @@ window.tagesblickInit = function () {
   <div id="repB"></div>
 </dialog>
 <script>
+/* Diktieren: gemeinsame Meldungen. Wo der Browser keine Spracherkennung hat (zum Beispiel Firefox, iPad-App-Modus), steht ein Hinweis statt eines versteckten Knopfs. */
+window.tbDNo = 'Dieser Browser kann nicht selbst diktieren. Tipp stattdessen auf das Mikrofon-Symbol deiner Bildschirmtastatur, das diktiert in jedes Textfeld. In Chrome (Android) oder Safari (iPad, nicht als Home-Bildschirm-App) geht es hier direkt.';
+window.tbDErr = function (c) {
+  if (c === 'not-allowed' || c === 'service-not-allowed') return 'Mikrofon nicht erlaubt. Erlaube es für diese Seite in den Browser-Einstellungen (Schloss-Symbol neben der Adresse, dann Mikrofon) und lade die Seite neu.';
+  if (c === 'no-speech') return 'Ich habe nichts gehört. Tippe noch einmal und sprich gleich los.';
+  if (c === 'audio-capture') return 'Kein Mikrofon gefunden oder es wird gerade von etwas anderem benutzt.';
+  if (c === 'network') return 'Diktieren braucht Internet. Prüfe die Verbindung.';
+  if (c === 'aborted') return '';
+  return 'Diktieren unterbrochen (' + c + ').';
+};
 /* Report: Claude schreibt report.json (Morgen- und Abendlauf, auf Zuruf), die App zeigt ihn und liest ihn auf Wunsch vor. */
 (function () {
   if (window.TB_VARIANT === 'pauline') return;
