@@ -1014,7 +1014,7 @@ window.tagesblickInit = function () {
   var tomorrowList = E.filter(function (e) { return !isAllDay(e) && occurs(e, 1); }).sort(byTime);
   /* Wie eine Sekretärin: bis 14 Tage vorher steht alles hier, Dinge mit langem Vorlauf (Arzt, Schulung) ab ihrem Erinnerungstag. */
   var aheadList = E.filter(function (e) {
-    if (!e.datum || isDone(e) || isAllDay(e)) return false;
+    if (!e.datum || isDone(e) || (isAllDay(e) && !(e.erinnern && e.erinnern.length))) return false; /* Ganztägiges mit "erinnern" (Feiertage, Mama Zeit) steht ab der ersten Erinnerung unter Demnächst */
     var n = diff(e.datum), lead = e.vorlauf != null ? e.vorlauf : 3;
     return n >= 2 && (n <= 14 || n - lead <= 0);
   })
