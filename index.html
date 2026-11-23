@@ -849,14 +849,15 @@ html[data-theme="ueberraschung"] .editbtn:hover, html[data-theme="ueberraschung"
     <div class="auf-row"><label for="aufTage">Aufschieben um</label>
       <select id="aufTage" class="wdh"><option value="1">1 Tag (bis morgen)</option><option value="2">2 Tage</option><option value="3">3 Tage</option><option value="7">7 Tage</option><option value="14">14 Tage</option></select></div>
     <div class="auf-row">
-      <label><input type="radio" name="aufM" value="ohne" checked> Ohne Grund</label>
       <label><input type="radio" name="aufM" value="mit"> Mit Grund</label>
+      <label><input type="radio" name="aufM" value="ohne" checked> Ohne Grund</label>
     </div>
-    <p class="auf-hint">Ohne Grund: Die Aufgabe zählt weiter als offen, die Priorität steigt. Mit Grund: Diese Tage zählen nicht, aber Claude sieht deinen Grund und kann nachfragen.</p>
-    <div id="aufG" hidden>
-      <textarea id="aufTxt" rows="3" placeholder="Warum schiebst du es auf? Tippen oder diktieren."></textarea>
+    <p class="auf-hint">Das sind nur Abkürzungen. „Mit Grund“: es gibt einen echten Grund (zum Beispiel Meeting), der Aufschub zählt nicht als Drückebergerei. „Ohne Grund“: du willst keinen nennen, das wird mitgezählt. In beiden Fällen kannst du unten ehrlich sagen, warum.</p>
+    <div id="aufG">
+      <textarea id="aufTxt" rows="3" placeholder="Warum schiebst du es auf? Ehrlich, getippt oder diktiert (kann auch leer bleiben)."></textarea>
       <button class="btn" type="button" id="aufMic" hidden aria-pressed="false">🎤 Diktieren</button>
     </div>
+    <div class="auf-row"><label><input type="checkbox" id="aufWen"> Es ist gerade nicht mehr so dringend (die Tage machen die Aufgabe dann nicht dringender)</label></div>
     <p class="auf-hint" id="aufHist"></p>
     <p class="auf-err" id="aufErr" role="alert"></p>
     <div class="auf-row"><button class="btn" type="submit" id="aufOk">Aufschieben</button><button class="btn" type="button" id="aufNo">Abbrechen</button></div>
@@ -954,11 +955,11 @@ window.tagesblickInit = function () {
   function taskAge(e) {
     var base = e.aufgenommen, n = wdh(e), v = doneSet[e.id];
     if (n && typeof v === 'string' && ISODATE.test(v) && addIso(v, n) > base) base = addIso(v, n); /* zählt ab dem Tag, an dem sie wieder fällig wurde */
-    return Math.max(0, -diff(base) - snzInfo(e).g); /* Tage, die Markus mit Grund aufgeschoben hat, zählen nicht */
+    return Math.max(0, -diff(base) - snzInfo(e).g); /* Tage, die Markus als „nicht mehr so dringend“ aufgeschoben hat, zählen nicht */
   }
   /* Aufschieben ohne Grund: Die Aufgabe verschwindet für N Tage, ihr Alter läuft aber weiter. Jeder Aufschub wird gezählt und die Priorität steigt immer weiter. */
   function snzInfo(e) {
-    /* Wert: bis|ohne Grund (Anzahl)|mit Grund (Anzahl)|Tage mit Grund (zählen nicht als offen) */
+    /* Wert: bis|ohne Grund (Anzahl)|mit Grund (Anzahl)|Tage, die die Dringlichkeit nicht erhöhen ("nicht mehr so dringend") */
     var v = doneSet['snz:' + e.id]; if (!v) return { bis: '', n: 0, m: 0, g: 0 };
     var p = String(v).split('|'); return { bis: ISODATE.test(p[0]) ? p[0] : '', n: Number(p[1]) || 0, m: Number(p[2]) || 0, g: Number(p[3]) || 0 };
   }
@@ -1130,7 +1131,7 @@ window.tagesblickInit = function () {
     setInterval(flush, 30000); setTimeout(flush, 4000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) flush(); });
     function mode() { return dlg.querySelector('input[name="aufM"]:checked').value; }
-    function sync() { var mit = mode() === 'mit'; $('aufG').hidden = !mit; $('aufErr').textContent = ''; if (mit) $('aufTxt').focus(); }
+    function sync() { $('aufErr').textContent = ''; }
     function stopMic() { if (rec) { try { rec.stop(); } catch (e) {} } }
     function close() { stopMic(); if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); }
     [].forEach.call(dlg.querySelectorAll('input[name="aufM"]'), function (r) { r.addEventListener('change', sync); });
@@ -1158,19 +1159,19 @@ window.tagesblickInit = function () {
       cur = (D.eintraege || []).filter(function (x) { return x.id === b.getAttribute('data-id'); })[0]; if (!cur) return;
       $('aufT').textContent = 'Aufschieben: ' + cur.titel;
       dlg.querySelector('input[name="aufM"][value="ohne"]').checked = true;
-      $('aufTxt').value = ''; $('aufTage').value = '1'; sync();
+      $('aufTxt').value = ''; $('aufWen').checked = false; $('aufTage').value = '1'; sync();
       var si = snzInfo(cur); $('aufHist').textContent = si.n || si.m ? 'Bisher aufgeschoben: ' + si.n + '× ohne Grund, ' + si.m + '× mit Grund.' : '';
       if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
     });
     $('aufF').addEventListener('submit', function (ev) {
       ev.preventDefault(); if (!cur) return;
       var mit = mode() === 'mit', tage = Number($('aufTage').value) || 1, grund = $('aufTxt').value.trim();
-      if (mit && !grund) { $('aufErr').textContent = 'Bitte nenne den Grund (tippen oder diktieren) oder wähle „Ohne Grund“.'; return; }
+      var wen = $('aufWen').checked;
       stopMic();
       var s = snzInfo(cur), bis = addIso(TODAY_ISO, tage), alter0 = taskAge(cur);
-      var val = bis + '|' + (s.n + (mit ? 0 : 1)) + '|' + (s.m + (mit ? 1 : 0)) + '|' + (s.g + (mit ? tage : 0)), key = 'snz:' + cur.id;
+      var val = bis + '|' + (s.n + (mit ? 0 : 1)) + '|' + (s.m + (mit ? 1 : 0)) + '|' + (s.g + (wen ? tage : 0)), key = 'snz:' + cur.id;
       if (ERL) ERL.set(key, val); else { doneSet[key] = val; store('pauline-erledigt', doneSet); }
-      var q = ops(); q.push({ id: cur.id, titel: cur.titel, zeit: new Date().toISOString(), tage: tage, bis: bis, mitGrund: mit, grund: mit ? grund.slice(0, 600) : '', nOhne: s.n + (mit ? 0 : 1), nMit: s.m + (mit ? 1 : 0), alterTage: alter0 });
+      var q = ops(); q.push({ id: cur.id, titel: cur.titel, zeit: new Date().toISOString(), tage: tage, bis: bis, mitGrund: mit, grund: grund.slice(0, 600), wenigerDringend: wen, nOhne: s.n + (mit ? 0 : 1), nMit: s.m + (mit ? 1 : 0), alterTage: alter0 });
       putOps(q); flush();
       close(); renderLists(); updateOpen();
     });
