@@ -498,6 +498,14 @@ h2 { font-size: 15px; letter-spacing: .02em; }
 .meta { font-size: 11.5px; margin-top: 2px; gap: 2px 8px; }
 select.wdh { font: inherit; font-size: 11.5px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 1px 4px; }
 select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
+.btn.aufb { font-size: 11.5px; padding: 1px 8px; }
+#aufD { max-width: min(440px, 92vw); }
+#aufD h3 { margin: 0 0 10px; }
+#aufD .auf-row { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 8px 0; }
+#aufD label { cursor: pointer; }
+#aufD textarea { width: 100%; box-sizing: border-box; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+#aufD .auf-hint { font-size: 12.5px; color: var(--muted); margin: 4px 0 0; }
+#aufD .auf-err { color: var(--akut); font-size: 13px; min-height: 1.2em; }
 .why { font-size: 11.5px; margin-top: 2px; }
 .kind, .pill { font-size: 10px; }
 .prep { margin-top: 6px; gap: 4px; }
@@ -835,6 +843,25 @@ html[data-theme="ueberraschung"] .editbtn:hover, html[data-theme="ueberraschung"
           </section>
         </dialog>
         <div class="mail-report-bar" id="zrHistBar" hidden><button class="btn" type="button" id="zrHistBtn">Erledigte Zurufe</button></div>
+        <dialog id="aufD" class="mail-report" aria-label="Aufschieben">
+  <form id="aufF" autocomplete="off">
+    <h3 id="aufT">Aufschieben</h3>
+    <div class="auf-row"><label for="aufTage">Aufschieben um</label>
+      <select id="aufTage" class="wdh"><option value="1">1 Tag (bis morgen)</option><option value="2">2 Tage</option><option value="3">3 Tage</option><option value="7">7 Tage</option><option value="14">14 Tage</option></select></div>
+    <div class="auf-row">
+      <label><input type="radio" name="aufM" value="ohne" checked> Ohne Grund</label>
+      <label><input type="radio" name="aufM" value="mit"> Mit Grund</label>
+    </div>
+    <p class="auf-hint">Ohne Grund: Die Aufgabe zählt weiter als offen, die Priorität steigt. Mit Grund: Diese Tage zählen nicht, aber Claude sieht deinen Grund und kann nachfragen.</p>
+    <div id="aufG" hidden>
+      <textarea id="aufTxt" rows="3" placeholder="Warum schiebst du es auf? Tippen oder diktieren."></textarea>
+      <button class="btn" type="button" id="aufMic" hidden aria-pressed="false">🎤 Diktieren</button>
+    </div>
+    <p class="auf-hint" id="aufHist"></p>
+    <p class="auf-err" id="aufErr" role="alert"></p>
+    <div class="auf-row"><button class="btn" type="submit" id="aufOk">Aufschieben</button><button class="btn" type="button" id="aufNo">Abbrechen</button></div>
+  </form>
+</dialog>
         <dialog id="zrHist" class="mail-report" aria-label="Erledigte Zurufe"></dialog>
         <ul class="zr-list" id="zrList"></ul>
       </div></section>
@@ -927,19 +954,20 @@ window.tagesblickInit = function () {
   function taskAge(e) {
     var base = e.aufgenommen, n = wdh(e), v = doneSet[e.id];
     if (n && typeof v === 'string' && ISODATE.test(v) && addIso(v, n) > base) base = addIso(v, n); /* zählt ab dem Tag, an dem sie wieder fällig wurde */
-    return Math.max(0, -diff(base));
+    return Math.max(0, -diff(base) - snzInfo(e).g); /* Tage, die Markus mit Grund aufgeschoben hat, zählen nicht */
   }
   /* Aufschieben ohne Grund: Die Aufgabe verschwindet für N Tage, ihr Alter läuft aber weiter. Jeder Aufschub wird gezählt und die Priorität steigt immer weiter. */
   function snzInfo(e) {
-    var v = doneSet['snz:' + e.id]; if (!v) return { bis: '', n: 0 };
-    var p = String(v).split('|'); return { bis: ISODATE.test(p[0]) ? p[0] : '', n: Number(p[1]) || 0 };
+    /* Wert: bis|ohne Grund (Anzahl)|mit Grund (Anzahl)|Tage mit Grund (zählen nicht als offen) */
+    var v = doneSet['snz:' + e.id]; if (!v) return { bis: '', n: 0, m: 0, g: 0 };
+    var p = String(v).split('|'); return { bis: ISODATE.test(p[0]) ? p[0] : '', n: Number(p[1]) || 0, m: Number(p[2]) || 0, g: Number(p[3]) || 0 };
   }
   function snoozed(e) { var s = snzInfo(e); return !!s.bis && TODAY_ISO < s.bis && !isDone(e); }
   function taskPriority(e) {
-    var age = taskAge(e), n = snzInfo(e).n;
+    var age = taskAge(e), si = snzInfo(e), n = si.n;
     var lvl = age >= 21 ? 'Nicht mehr aufschiebbar' : age >= 14 ? 'Dringend' : age >= 7 ? 'Hohe Priorität' : age >= 3 ? 'Erhöhte Priorität' : 'Normale Priorität';
     return { stufe: age >= 7 ? 'akut' : age >= 3 ? 'bald' : 'ruhig',
-      text: lvl + ' · seit ' + age + ' ' + (age === 1 ? 'Tag' : 'Tagen') + ' offen' + (n ? ' · ' + n + '× ohne Grund aufgeschoben' : '') };
+      text: lvl + ' · seit ' + age + ' ' + (age === 1 ? 'Tag' : 'Tagen') + ' offen' + (n ? ' · ' + n + '× ohne Grund aufgeschoben' : '') + (si.m ? ' · ' + si.m + '× mit Grund' : '') };
   }
   function entryPriority(e) { return isUndatedTask(e) && !isDone(e) ? taskPriority(e) : e.pill; }
   var OVERDUE = ['Aufgabe', 'E-Mail', 'Vorsorge', 'Arbeit', 'Schulung'];
@@ -998,9 +1026,7 @@ window.tagesblickInit = function () {
         meta += '<select class="wdh" data-id="' + esc(e.id) + '" aria-label="Wiederholen: ' + esc(e.titel) + '">' +
           '<optgroup label="Wiederholen">' + [[0, 'Einmalig'], [1, 'Täglich'], [2, 'Alle 2 Tage'], [3, 'Alle 3 Tage'], [7, 'Wöchentlich'], [14, 'Alle 2 Wochen'], [30, 'Monatlich']].map(function (o) {
             return '<option value="' + o[0] + '"' + (o[0] === wn ? ' selected' : '') + '>' + (o[0] ? '↻ ' : '') + o[1] + '</option>';
-          }).join('') + '</optgroup><optgroup label="Aufschieben ohne Grund">' + [1, 2, 3, 7, 14].map(function (n) {
-            return '<option value="s' + n + '">' + n + '*</option>';
-          }).join('') + '</optgroup></select>';
+          }).join('') + '</optgroup></select><button type="button" class="btn aufb" data-id="' + esc(e.id) + '">Aufschieben</button>';
       }
     }
     if (e.bis) meta += '<span>' + shortDate(diff(e.datum)) + ' bis ' + shortDate(diff(e.bis)) + '</span>';
@@ -1069,12 +1095,6 @@ window.tagesblickInit = function () {
   $('today').addEventListener('change', function (ev) {
     if (ev.target.classList.contains('wdh')) { /* Dropdown "Wiederholen" */
       var wid = ev.target.getAttribute('data-id'), we = (D.eintraege || []).filter(function (x) { return x.id === wid; })[0], wk = 'wdh:' + wid;
-      if (/^s\d+$/.test(ev.target.value)) { /* Aufschieben ohne Grund: N Tage weg, Alter und Zähler laufen weiter */
-        var sk = 'snz:' + wid, sn = snzInfo(we || { id: wid }).n + 1, sval = addIso(TODAY_ISO, Number(ev.target.value.slice(1))) + '|' + sn;
-        if (ERL) ERL.set(sk, sval); else { doneSet[sk] = sval; store('pauline-erledigt', doneSet); }
-        renderLists(); updateOpen();
-        return;
-      }
       var wv = Number(ev.target.value);
       var wval = wv > 0 ? String(wv) : (we && Number(we.wiederholung) > 0 ? '0' : null);
       if (ERL) ERL.set(wk, wval);
@@ -1091,6 +1111,70 @@ window.tagesblickInit = function () {
     else { if (val) doneSet[key] = val; else delete doneSet[key]; store('pauline-erledigt', doneSet); }
     updateOpen();
   });
+
+  /* Aufschieben: Dialog mit Dauer, "mit/ohne Grund" und Begründung (getippt oder diktiert).
+     Der Aufschub steht in erledigt.json (snz:<id>), die Begründung als Protokoll in aufschub.json, damit Claude sie verfolgen und eingreifen kann. */
+  (function () {
+    if (window.TB_VARIANT === 'pauline') return;
+    var dlg = $('aufD'); if (!dlg) return;
+    var cur = null, QK = 'pauline-aufschub-ops', rec = null, SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    function ops() { try { return JSON.parse(localStorage.getItem(QK) || '[]') || []; } catch (e) { return []; } }
+    function putOps(a) { try { localStorage.setItem(QK, JSON.stringify(a)); } catch (e) {} }
+    function flush() {
+      var q = ops(), io = window.TB_AUFSCHUB_IO; if (!q.length || !io) return;
+      io.apply(function (o) {
+        var have = {}; o.eintraege.forEach(function (x) { have[x.zeit + x.id] = 1; });
+        q.forEach(function (x) { if (!have[x.zeit + x.id]) o.eintraege.push(x); });
+      }).then(function () { putOps(ops().slice(q.length)); }).catch(function () {});
+    }
+    setInterval(flush, 30000); setTimeout(flush, 4000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) flush(); });
+    function mode() { return dlg.querySelector('input[name="aufM"]:checked').value; }
+    function sync() { var mit = mode() === 'mit'; $('aufG').hidden = !mit; $('aufErr').textContent = ''; if (mit) $('aufTxt').focus(); }
+    function stopMic() { if (rec) { try { rec.stop(); } catch (e) {} } }
+    function close() { stopMic(); if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); }
+    [].forEach.call(dlg.querySelectorAll('input[name="aufM"]'), function (r) { r.addEventListener('change', sync); });
+    $('aufNo').addEventListener('click', close);
+    dlg.addEventListener('close', stopMic);
+    if (SR) {
+      var mic = $('aufMic'); mic.hidden = false;
+      mic.addEventListener('click', function () {
+        if (rec) { rec.stop(); return; }
+        var ta = $('aufTxt'), basis = ta.value ? ta.value.replace(/\s*$/, ' ') : '';
+        rec = new SR(); rec.lang = 'de-DE'; rec.continuous = true; rec.interimResults = true;
+        rec.onresult = function (ev) {
+          var fertig = '', vorl = '';
+          for (var i = ev.resultIndex; i < ev.results.length; i++) { if (ev.results[i].isFinal) fertig += ev.results[i][0].transcript; else vorl += ev.results[i][0].transcript; }
+          if (fertig) basis += fertig.trim() + ' ';
+          ta.value = basis + vorl;
+        };
+        rec.onerror = function (ev) { $('aufErr').textContent = ev.error === 'not-allowed' ? 'Mikrofon nicht erlaubt. Bitte im Browser für diese Seite freigeben.' : 'Diktieren unterbrochen (' + ev.error + ').'; };
+        rec.onend = function () { ta.value = basis.trim(); mic.textContent = '🎤 Diktieren'; mic.setAttribute('aria-pressed', 'false'); rec = null; };
+        try { rec.start(); mic.textContent = '■ Stopp'; mic.setAttribute('aria-pressed', 'true'); } catch (e) { rec = null; }
+      });
+    }
+    $('today').addEventListener('click', function (ev) {
+      var b = ev.target.closest && ev.target.closest('.aufb'); if (!b) return;
+      cur = (D.eintraege || []).filter(function (x) { return x.id === b.getAttribute('data-id'); })[0]; if (!cur) return;
+      $('aufT').textContent = 'Aufschieben: ' + cur.titel;
+      dlg.querySelector('input[name="aufM"][value="ohne"]').checked = true;
+      $('aufTxt').value = ''; $('aufTage').value = '1'; sync();
+      var si = snzInfo(cur); $('aufHist').textContent = si.n || si.m ? 'Bisher aufgeschoben: ' + si.n + '× ohne Grund, ' + si.m + '× mit Grund.' : '';
+      if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    });
+    $('aufF').addEventListener('submit', function (ev) {
+      ev.preventDefault(); if (!cur) return;
+      var mit = mode() === 'mit', tage = Number($('aufTage').value) || 1, grund = $('aufTxt').value.trim();
+      if (mit && !grund) { $('aufErr').textContent = 'Bitte nenne den Grund (tippen oder diktieren) oder wähle „Ohne Grund“.'; return; }
+      stopMic();
+      var s = snzInfo(cur), bis = addIso(TODAY_ISO, tage), alter0 = taskAge(cur);
+      var val = bis + '|' + (s.n + (mit ? 0 : 1)) + '|' + (s.m + (mit ? 1 : 0)) + '|' + (s.g + (mit ? tage : 0)), key = 'snz:' + cur.id;
+      if (ERL) ERL.set(key, val); else { doneSet[key] = val; store('pauline-erledigt', doneSet); }
+      var q = ops(); q.push({ id: cur.id, titel: cur.titel, zeit: new Date().toISOString(), tage: tage, bis: bis, mitGrund: mit, grund: mit ? grund.slice(0, 600) : '', nOhne: s.n + (mit ? 0 : 1), nMit: s.m + (mit ? 1 : 0), alterTage: alter0 });
+      putOps(q); flush();
+      close(); renderLists(); updateOpen();
+    });
+  })();
 
   /* Nächster Termin heute */
   (function () {
@@ -2780,6 +2864,28 @@ window.tagesblickInit = function () {
             });
           });
           ideenLauf = p.catch(function () {});
+          return p;
+        }
+      };
+      /* Aufschub-Protokoll: aufschub.json (Begründungen, für Claude zum Verfolgen) */
+      var aufLauf = Promise.resolve();
+      function ladeAuf(tok) {
+        return fetch(url('aufschub.json'), { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store' })
+          .then(function (r) { if (r.status === 404) return { eintraege: [] }; if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function (o) { if (!o || !Array.isArray(o.eintraege)) o = { eintraege: [] }; return o; });
+      }
+      if (!V) window.TB_AUFSCHUB_IO = {
+        apply: function (fn) {
+          var p = aufLauf.then(function () {
+            return token().then(function (tok) {
+              return ladeAuf(tok).then(function (o) {
+                fn(o);
+                return fetch(url('aufschub.json'), { method: 'PUT', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify(o, null, 1) })
+                  .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return o; });
+              });
+            });
+          });
+          aufLauf = p.catch(function () {});
           return p;
         }
       };
