@@ -100,7 +100,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-2); 
 .wm .ers { position: relative; display: inline-block; font-style: normal; }
 .wm .ers i { font-style: normal; }
 .wm i.ex { font-style: normal; margin-left: .04em; }
-html.v-pauline [data-id="post"], html.v-pauline [data-id="melden"], html.v-pauline #shopBtn, html.v-pauline #ideenBtn, html.v-pauline #bibBtn, html.v-pauline #repBtn, html.v-pauline #repD, html.v-pauline #bibO, html.v-pauline #bibR, html.v-pauline #lGmail, html.v-pauline #lKal,
+html.v-pauline [data-id="post"], html.v-pauline [data-id="melden"], html.v-pauline #shopBtn, html.v-pauline #ideenBtn, html.v-pauline #bibBtn, html.v-pauline #repBtn, html.v-pauline #repD, html.v-pauline #rqD, html.v-pauline #bibO, html.v-pauline #bibR, html.v-pauline #lGmail, html.v-pauline #lKal,
 html.v-pauline #srcBtn, html.v-pauline #menuHelp, html.v-pauline #foot { display: none !important; }
 .wm .ers:last-of-type { margin-left: .14em; }
 .wm .alt { display: inline-block; transform: translateY(.36em) rotate(24deg); transform-origin: 50% 50%; opacity: .38; font-size: .9em; animation: wmfall 1.1s cubic-bezier(.45,0,.9,.55) .5s both; }
@@ -515,6 +515,11 @@ select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
 @media (prefers-reduced-motion: reduce) { .item.lvl3:not(.done) { animation: none; } }
 .item.lvl2 { border: 0; border-left: 4px solid var(--bald); border-radius: 6px; padding: 8px 10px; margin: 4px 0; background: color-mix(in srgb, var(--bald) 8%, transparent); }
 .item.done.lvl3, .item.done.lvl2 { border-color: var(--line); background: none; box-shadow: none; }
+#rqD { max-width: min(520px, 94vw); border: 2px solid var(--accent); }
+#rqD h3 { margin: 0 0 8px; }
+#rqD .rq-kicker { margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-2); }
+#rqD .rq-q { margin: 0 0 10px; line-height: 1.55; white-space: pre-wrap; }
+#rqD textarea { width: 100%; box-sizing: border-box; font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
 #repD { max-width: min(560px, 94vw); max-height: 88vh; overflow: auto; }
 #repD h3 { margin: 0 0 4px; }
 #repD h4 { margin: 16px 0 4px; color: var(--accent-2); font-size: 14px; }
@@ -2673,6 +2678,97 @@ window.tagesblickInit = function () {
   document.addEventListener('visibilitychange', function () { if (document.hidden && dirty) pushLater(true); });
 })();
 </script>
+<dialog id="rqD" class="mail-report" aria-label="Rückfrage">
+  <form id="rqF" autocomplete="off">
+    <p class="rq-kicker">Rückfrage von Claude</p>
+    <h3 id="rqT">Rückfrage</h3>
+    <p id="rqQ" class="rq-q"></p>
+    <textarea id="rqTxt" rows="5" placeholder="Sprich einfach drauflos oder tipp ein paar Sätze. Es muss nicht schön sein."></textarea>
+    <div class="auf-row">
+      <button class="btn" type="button" id="rqMic" hidden aria-pressed="false">🎤 Diktieren</button>
+    </div>
+    <p class="auf-err" id="rqErr" role="alert"></p>
+    <div class="auf-row">
+      <button class="btn" type="submit" id="rqOk">Antworten</button>
+      <button class="btn" type="button" id="rqLater">Jetzt nicht (in 15 Min. wieder)</button>
+    </div>
+    <p class="auf-hint" id="rqHint"></p>
+  </form>
+</dialog>
+<script>
+/* Rückfragen: Claude stellt Fragen zu Aufgaben (rueckfragen.json). Das Fenster kommt wieder, bis Markus geantwortet hat. Jedes "Jetzt nicht" wird gezählt. */
+(function () {
+  if (window.TB_VARIANT === 'pauline') return;
+  var dlg = document.getElementById('rqD'); if (!dlg) return;
+  function $(i) { return document.getElementById(i); }
+  var QK = 'pauline-rq-ops', SK = 'pauline-rq-spaeter', cur = null, rec = null, SR = window.SpeechRecognition || window.webkitSpeechRecognition, busy = false;
+  function get(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+  function put(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function load() {
+    var io = window.TB_RUECK_IO;
+    return io ? io.load() : fetch('rueckfragen.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.json(); });
+  }
+  function apply(fn) { var io = window.TB_RUECK_IO; return io ? io.apply(fn) : Promise.reject(new Error('offline')); }
+  function flush() {
+    var q = get(QK, []); if (!q.length || !window.TB_RUECK_IO) return;
+    apply(function (o) { q.forEach(function (op) { var f = o.fragen.filter(function (x) { return x.id === op.id; })[0]; if (!f) return; if (op.antwort) { f.antwort = op.antwort; f.status = 'beantwortet'; f.beantwortet = op.zeit; } if (op.later) f.weggedrueckt = (f.weggedrueckt || 0) + 1; }); })
+      .then(function () { put(QK, get(QK, []).slice(q.length)); }).catch(function () {});
+  }
+  function spaeter() { return get(SK, {}); }
+  function pick(o) {
+    var sp = spaeter(), now = Date.now(), beantwortet = {};
+    get(QK, []).forEach(function (op) { if (op.antwort) beantwortet[op.id] = 1; }); /* schon beantwortet, aber noch nicht in OneDrive */
+    return (o.fragen || []).filter(function (f) { return f.status === 'offen' && !beantwortet[f.id] && (!sp[f.id] || sp[f.id] <= now); })[0] || null;
+  }
+  function stopMic() { if (rec) { try { rec.stop(); } catch (e) {} } }
+  function show(f) {
+    cur = f; $('rqT').textContent = f.aufgabeTitel || 'Rückfrage'; $('rqQ').textContent = f.frage || ''; $('rqTxt').value = ''; $('rqErr').textContent = '';
+    $('rqHint').textContent = f.weggedrueckt ? 'Bisher ' + f.weggedrueckt + '× weggedrückt. Antworten geht schneller als Wegdrücken: ein paar Sätze reichen.' : 'Ein paar Sätze reichen. Das hilft mir, dir die Aufgabe in kleine Schritte zu zerlegen.';
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  }
+  function check() {
+    if (busy || dlg.open) return;
+    var others = document.querySelectorAll('dialog[open]'); if (others.length) return;
+    busy = true;
+    load().then(function (o) { var f = pick(o || {}); if (f) show(f); }).catch(function () {}).then(function () { busy = false; });
+  }
+  function close() { stopMic(); if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); }
+  dlg.addEventListener('cancel', function (ev) { ev.preventDefault(); }); /* Esc schließt nicht: erst antworten oder "Jetzt nicht" */
+  $('rqLater').addEventListener('click', function () {
+    if (!cur) return;
+    var sp = spaeter(); sp[cur.id] = Date.now() + 15 * 60 * 1000; put(SK, sp);
+    var q = get(QK, []); q.push({ id: cur.id, later: true, zeit: new Date().toISOString() }); put(QK, q); flush(); close();
+  });
+  $('rqF').addEventListener('submit', function (ev) {
+    ev.preventDefault(); if (!cur) return;
+    var t = $('rqTxt').value.trim();
+    if (!t) { $('rqErr').textContent = 'Bitte schreib oder sprich ein paar Sätze, oder wähle „Jetzt nicht“.'; return; }
+    var q = get(QK, []); q.push({ id: cur.id, antwort: t.slice(0, 3000), zeit: new Date().toISOString() }); put(QK, q);
+    flush(); close(); setTimeout(check, 1500);
+  });
+  if (SR) {
+    var mic = $('rqMic'); mic.hidden = false;
+    mic.addEventListener('click', function () {
+      if (rec) { rec.stop(); return; }
+      var ta = $('rqTxt'), basis = ta.value ? ta.value.replace(/\s*$/, ' ') : '';
+      rec = new SR(); rec.lang = 'de-DE'; rec.continuous = true; rec.interimResults = true;
+      rec.onresult = function (ev) {
+        var fertig = '', vorl = '';
+        for (var i = ev.resultIndex; i < ev.results.length; i++) { if (ev.results[i].isFinal) fertig += ev.results[i][0].transcript; else vorl += ev.results[i][0].transcript; }
+        if (fertig) basis += fertig.trim() + ' ';
+        ta.value = basis + vorl;
+      };
+      rec.onerror = function (ev) { $('rqErr').textContent = ev.error === 'not-allowed' ? 'Mikrofon nicht erlaubt. Bitte im Browser für diese Seite freigeben.' : 'Diktieren unterbrochen (' + ev.error + ').'; };
+      rec.onend = function () { ta.value = basis.trim(); mic.textContent = '🎤 Diktieren'; mic.setAttribute('aria-pressed', 'false'); rec = null; };
+      try { rec.start(); mic.textContent = '■ Stopp'; mic.setAttribute('aria-pressed', 'true'); } catch (e) { rec = null; }
+    });
+  }
+  setInterval(function () { flush(); check(); }, 60000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { flush(); check(); } });
+  setTimeout(function () { flush(); check(); }, 3500);
+  window.tbRueckCheck = check;
+})();
+</script>
 <dialog id="repD" class="mail-report" aria-label="Report">
   <h3 id="repT">Report</h3>
   <p class="rep-meta" id="repM"></p>
@@ -3017,6 +3113,29 @@ window.tagesblickInit = function () {
             });
           });
           ideenLauf = p.catch(function () {});
+          return p;
+        }
+      };
+      /* Rückfragen: rueckfragen.json (Claude stellt Fragen, die App trägt Markus' Antworten ein) */
+      var rqLauf = Promise.resolve();
+      function ladeRq(tok) {
+        return fetch(url('rueckfragen.json'), { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store' })
+          .then(function (r) { if (r.status === 404) return { fragen: [] }; if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function (o) { if (!o || !Array.isArray(o.fragen)) o = { fragen: [] }; return o; });
+      }
+      if (!V) window.TB_RUECK_IO = {
+        load: function () { return token().then(ladeRq); },
+        apply: function (fn) {
+          var p = rqLauf.then(function () {
+            return token().then(function (tok) {
+              return ladeRq(tok).then(function (o) {
+                fn(o);
+                return fetch(url('rueckfragen.json'), { method: 'PUT', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify(o, null, 1) })
+                  .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return o; });
+              });
+            });
+          });
+          rqLauf = p.catch(function () {});
           return p;
         }
       };
