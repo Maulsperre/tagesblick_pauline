@@ -528,6 +528,17 @@ select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
 #repD .rep-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
 #repD .rep-old { color: var(--bald); }
 #repD .rep-hint { border-left: 3px solid var(--accent-2); padding-left: 10px; font-size: 13.5px; }
+.item.cmp .more { display: none; margin-top: 6px; }
+.item.cmp.open .more { display: block; }
+.tog { font: inherit; font-size: 12px; line-height: 1; margin-left: 6px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; vertical-align: middle; }
+.tog:hover, .tog:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+.item.open .tog { transform: rotate(180deg); }
+.item.cmp .meta.ctl { margin-top: 8px; }
+.restwrap { display: block; list-style: none; padding: 8px 0 0 !important; margin: 6px 0 0; border-top: 1px dashed var(--line) !important; grid-column: 1 / -1; }
+.restwrap > details > summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 6px 2px; }
+.restwrap > details > summary:hover { color: var(--accent); }
+.restwrap .items { margin-top: 4px; }
+.restwrap.donebox > details > summary { color: var(--ruhig); }
 .btn.aufb { font-size: 11.5px; padding: 1px 8px; }
 #aufD { max-width: min(440px, 92vw); }
 #aufD h3 { margin: 0 0 10px; }
@@ -1079,6 +1090,7 @@ window.tagesblickInit = function () {
       return '<span class="pill ' + (a.hart ? 'akut' : 'bald') + '">' + (a.hart ? '⛔ Blockiert durch: ' : '↳ Besser erst: ') + esc(o ? o.titel : a.von) + (a.grund ? ' (' + esc(a.grund) + ')' : '') + '</span>';
     }).join('');
   }
+  var OPENIDS = {}, BOXOPEN = {}, RESTN = 0, CAP = 8; /* höchstens 8 Aufgaben gleichzeitig sichtbar, der Rest ist eingeklappt */
   function item(e, opts) {
     var when = opts.count ? '<span class="when">' + diff(e.datum) + ' T</span>'
       : e.zeit ? '<span class="when">' + esc(e.zeit) + '</span>' : '<span class="when none">––:––</span>';
@@ -1087,16 +1099,18 @@ window.tagesblickInit = function () {
     var meta = '<span class="kind">' + esc(e.art) + '</span>' + who(e.wer) +
       (opts.count ? abh(e) : (e.bereich ? '<span class="bereich">' + esc(e.bereich) + '</span>' : '') +
         (rang(e) < 99 ? '<span class="pill akut rang">Nr. ' + rang(e) + '</span>' : '') + (wicht(e) === 3 ? '<span class="pill akut">Kritisch</span>' : wicht(e) === 1 ? '<span class="pill info">Irgendwann</span>' : '') + abh(e) + pill(priority) + overdue);
+    var ctl = '';
     if (isUndatedTask(e)) {
       var wn = wdh(e);
-      meta += '<span>' + (wn ? 'Kehrt wieder' : 'Aufgenommen ' + shortDate(diff(e.aufgenommen))) + '</span>';
+      ctl += '<span>' + (wn ? 'Kehrt wieder' : 'Aufgenommen ' + shortDate(diff(e.aufgenommen))) + '</span>';
       if (opts.check && window.TB_VARIANT !== 'pauline') {
-        meta += '<select class="wdh" data-id="' + esc(e.id) + '" aria-label="Wiederholen: ' + esc(e.titel) + '">' +
+        ctl += '<select class="wdh" data-id="' + esc(e.id) + '" aria-label="Wiederholen: ' + esc(e.titel) + '">' +
           '<optgroup label="Wiederholen">' + [[0, 'Einmalig'], [1, 'Täglich'], [2, 'Alle 2 Tage'], [3, 'Alle 3 Tage'], [7, 'Wöchentlich'], [14, 'Alle 2 Wochen'], [30, 'Monatlich']].map(function (o) {
             return '<option value="' + o[0] + '"' + (o[0] === wn ? ' selected' : '') + '>' + (o[0] ? '↻ ' : '') + o[1] + '</option>';
           }).join('') + '</optgroup></select><button type="button" class="btn aufb" data-id="' + esc(e.id) + '">Aufschieben</button>';
       }
     }
+    if (!opts.check) meta += ctl;
     if (e.bis) meta += '<span>' + shortDate(diff(e.datum)) + ' bis ' + shortDate(diff(e.bis)) + '</span>';
     if (opts.count) {
       var n = diff(e.datum), lead = e.vorlauf != null ? e.vorlauf : 3, start = n - lead;
@@ -1106,6 +1120,7 @@ window.tagesblickInit = function () {
     var prep = e.vorbereitung && e.vorbereitung.length ? '<div class="prep">' + e.vorbereitung.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div>' : '';
     if (opts.check && e.schritte && e.schritte.length) {
       var sd = e.schritte.filter(function (st) { return stepDone(e, st); }).length;
+      meta += '<span class="pill info">Schritte ' + sd + '/' + e.schritte.length + '</span>';
       prep += '<div class="schritte-n">Schritte: ' + sd + ' von ' + e.schritte.length + '</div><ul class="schritte">' + e.schritte.map(function (st) {
         var on = stepDone(e, st);
         return '<li' + (on ? ' class="sdone"' : '') + '><label><input type="checkbox" data-step="' + esc(e.id + '#' + st.id) + '"' + (on ? ' checked' : '') + ' aria-label="Schritt: ' + esc(st.titel) + '"><span>' + esc(st.titel) + '</span></label></li>';
@@ -1120,9 +1135,13 @@ window.tagesblickInit = function () {
       if (wicht(e) === 3 || extrem) lvl = ' lvl3' + (extrem || rang(e) <= 3 ? ' pulse' : '');
       else if (wicht(e) === 2 || wp === 'akut') lvl = ' lvl2';
     }
-    return '<li class="item' + (done ? ' done' : '') + lvl + '" data-who="' + esc(e.wer) + '">' + when +
-      '<div><div class="title">' + titled(e, e.titel) + '</div><div class="meta">' + meta + '</div>' +
-      (e.warum ? '<div class="why">' + esc(e.warum) + '</div>' : '') + prep + '</div>' +
+    var why = e.warum ? '<div class="why">' + esc(e.warum) + '</div>' : '';
+    var more = opts.check ? why + prep + (ctl ? '<div class="meta ctl">' + ctl + '</div>' : '') : '';
+    var hasMore = !!more;
+    var isOpen = hasMore && OPENIDS[e.id];
+    return '<li class="item' + (opts.check ? ' cmp' : '') + (done ? ' done' : '') + lvl + (isOpen ? ' open' : '') + '" data-who="' + esc(e.wer) + '">' + when +
+      '<div><div class="title">' + titled(e, e.titel) + (hasMore ? ' <button type="button" class="tog" aria-expanded="' + (isOpen ? 'true' : 'false') + '" aria-label="Details ein- oder ausklappen">▾</button>' : '') + '</div><div class="meta">' + meta + '</div>' +
+      (opts.check ? (hasMore ? '<div class="more">' + more + '</div>' : '') : why + prep) + '</div>' +
       '<div class="side">' + side + '</div></li>';
   }
 
@@ -1161,7 +1180,24 @@ window.tagesblickInit = function () {
   }
   function renderLists() {
     paintAttrs('heute', 0); paintAttrs('morgen', 1);
-    $('today').innerHTML = todayList.filter(function (e) { return !snoozed(e) && !ruht(e); }).map(function (e) { return item(e, { check: true }); }).join('');
+    var vis = todayList.filter(function (e) { return !snoozed(e) && !ruht(e); });
+    var isTask = function (e) { return OVERDUE.indexOf(e.art) >= 0 && !e.hinweis; };
+    var dateKey = function (e) { return e.datum ? diff(e.datum) : 9999; };
+    var cmpPrio = function (a, b) { return (rang(a) - rang(b)) || (dateKey(a) - dateKey(b)) || (wicht(b) - wicht(a)) || ((isUndatedTask(b) ? taskAge(b) : 0) - (isUndatedTask(a) ? taskAge(a) : 0)); };
+    var openTasks = vis.filter(function (e) { return isTask(e) && !isDone(e); }).sort(cmpPrio);
+    var shownT = openTasks.slice(0, CAP), restT = openTasks.slice(CAP);
+    var doneL = vis.filter(function (e) { return isDone(e) && !e.hinweis; });
+    var mainL = vis.filter(function (e) { return !isDone(e) && (!isTask(e) || shownT.indexOf(e) >= 0); });
+    var box = function (key, cls, label, list) {
+      return list.length ? '<li class="restwrap ' + cls + '"><details data-box="' + key + '"' + (BOXOPEN[key] ? ' open' : '') + '><summary>' + label + '</summary><ul class="items">' +
+        list.map(function (e) { return item(e, { check: true }); }).join('') + '</ul></details></li>' : '';
+    };
+    RESTN = restT.length;
+    $('today').innerHTML = mainL.map(function (e) { return item(e, { check: true }); }).join('') +
+      box('rest', 'restbox', restT.length + ' weitere Aufgabe' + (restT.length === 1 ? '' : 'n') + ', ich behalte ' + (restT.length === 1 ? 'sie' : 'sie') + ' für dich im Blick', restT) +
+      box('done', 'donebox', doneL.length + ' erledigt heute ✓', doneL);
+    var gr = $('greet'); if (gr) gr.textContent = (h < 11 ? 'Guten Morgen.' : h < 18 ? 'Guten Tag.' : 'Guten Abend.') + ' ' +
+      (shownT.length + mainL.filter(function (e) { return !isTask(e); }).length === 0 ? 'Heute steht nichts Wichtiges an.' : 'Das ist dran: ' + shownT.length + (shownT.length === 1 ? ' Aufgabe' : ' Aufgaben') + (restT.length ? ', ' + restT.length + ' weitere habe ich im Blick.' : '.'));
     var wartend = E.filter(function (e) { return e.art === 'Aufgabe' && !e.erledigt && ruht(e); });
     var rn = $('ruhtNote'); if (rn) { rn.hidden = !wartend.length; rn.textContent = wartend.length ? 'Ruht, noch nicht dran: ' + wartend.map(function (e) { var w = winInfo(e); return e.titel + (w ? ' (bis ' + shortDate(w.b) + ')' : ' (Irgendwann)'); }).join(' · ') : ''; }
     $('tomorrow').innerHTML = tomorrowList.map(function (e) { return item(e, {}); }).join('');
@@ -1170,12 +1206,19 @@ window.tagesblickInit = function () {
     applyFilter();
   }
   function updateOpen() {
-    var left = $('today').querySelectorAll('input[data-id]:not(:checked)').length;
-    var akut = $('today').querySelectorAll('input[data-akut]:not(:checked)').length;
-    $('open').textContent = left === 0 ? 'Alles erledigt' : left + ' offen';
+    var left = $('today').querySelectorAll(':scope > li:not(.restwrap) input[data-id]:not(:checked)').length;
+    var akut = $('today').querySelectorAll(':scope > li:not(.restwrap) input[data-akut]:not(:checked)').length;
+    $('open').textContent = left === 0 && !RESTN ? 'Alles erledigt' : left + ' wichtig' + (RESTN ? ' · +' + RESTN + ' im Blick' : '');
     $('akut').textContent = akut + ' akut';
     $('akut').hidden = akut === 0;
   }
+  $('today').addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('.tog'); if (!b) return;
+    var li = b.closest('.item'), cb = li && li.querySelector('input[data-id]'); if (!li) return;
+    var on = !li.classList.contains('open'); li.classList.toggle('open', on); b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (cb) { if (on) OPENIDS[cb.getAttribute('data-id')] = 1; else delete OPENIDS[cb.getAttribute('data-id')]; }
+  });
+  $('today').addEventListener('toggle', function (ev) { var d = ev.target; if (d && d.getAttribute) { var k = d.getAttribute('data-box'); if (k) BOXOPEN[k] = d.open; } }, true);
   $('today').addEventListener('change', function (ev) {
     if (ev.target.hasAttribute('data-step')) { /* Schritt einer Aufgabe */
       var sk2 = ev.target.getAttribute('data-step'), sv = ev.target.checked ? TODAY_ISO : null;
