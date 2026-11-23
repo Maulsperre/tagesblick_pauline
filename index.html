@@ -496,6 +496,8 @@ h2 { font-size: 15px; letter-spacing: .02em; }
 .mbody { padding: 10px 12px 12px; gap: 10px; }
 .when { font-size: 12px; }
 .meta { font-size: 11.5px; margin-top: 2px; gap: 2px 8px; }
+select.wdh { font: inherit; font-size: 11.5px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 1px 4px; }
+select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
 .why { font-size: 11.5px; margin-top: 2px; }
 .kind, .pill { font-size: 10px; }
 .prep { margin-top: 6px; gap: 4px; }
@@ -889,11 +891,27 @@ window.tagesblickInit = function () {
   var doneSet = ERL ? ERL.map : (store('pauline-erledigt') || {});
   var TODAY_ISO = T.getFullYear() + '-' + String(T.getMonth() + 1).padStart(2, '0') + '-' + String(T.getDate()).padStart(2, '0');
   function dkey(e) { return e.wochentag != null ? e.id + '@' + TODAY_ISO : e.id; } /* Wiederkehrendes gilt nur für den heutigen Tag */
-  function isDone(e) { return !!(e.erledigt || doneSet[dkey(e)]); }
+  /* Wiederkehrende Aufgaben ohne Frist: Ein Haken gilt nur für N Tage, dann steht die Aufgabe wieder offen da.
+     N kommt aus dem Dropdown (gespeichert in erledigt.json unter "wdh:<id>", "0" = nie) oder aus "wiederholung" in daten.js. */
+  var ISODATE = /^\d{4}-\d\d-\d\d$/;
+  function addIso(iso, n) { var p = iso.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2] + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function wdh(e) {
+    if (e.art !== 'Aufgabe' || e.datum || e.wochentag != null) return 0;
+    var o = doneSet['wdh:' + e.id], n = o != null ? Number(o) : Number(e.wiederholung);
+    return n > 0 ? Math.floor(n) : 0;
+  }
+  function isDone(e) {
+    if (e.erledigt) return true;
+    var v = doneSet[dkey(e)], n = wdh(e);
+    if (!v) return false;
+    if (!n) return true;
+    return typeof v === 'string' && ISODATE.test(v) && TODAY_ISO < addIso(v, n);
+  }
   /* Haken tragen das Datum des Abhakens. Abgehaktes verschwindet am nächsten Tag; alte Haken ohne Datum gelten als älter. */
   function doneEarlier(e) {
     var v = e.erledigt || doneSet[dkey(e)];
     if (!v) return false;
+    if (wdh(e) && !e.erledigt && !isDone(e)) return false;
     return typeof v === 'string' && /^\d{4}-\d\d-\d\d$/.test(v) ? v < TODAY_ISO : true;
   }
 
@@ -906,7 +924,11 @@ window.tagesblickInit = function () {
   }
   function byTime(a, b) { return String(a.zeit || '99:99').localeCompare(String(b.zeit || '99:99')); }
   function isUndatedTask(e) { return e.art === 'Aufgabe' && e.aufgenommen && !e.datum; }
-  function taskAge(e) { return Math.max(0, -diff(e.aufgenommen)); }
+  function taskAge(e) {
+    var base = e.aufgenommen, n = wdh(e), v = doneSet[e.id];
+    if (n && typeof v === 'string' && ISODATE.test(v) && addIso(v, n) > base) base = addIso(v, n); /* zählt ab dem Tag, an dem sie wieder fällig wurde */
+    return Math.max(0, -diff(base));
+  }
   function taskPriority(e) {
     var age = taskAge(e);
     return { stufe: age >= 7 ? 'akut' : age >= 3 ? 'bald' : 'ruhig',
@@ -962,7 +984,16 @@ window.tagesblickInit = function () {
     var overdue = opts.check && e.datum && diff(e.datum) < 0 ? '<span class="pill akut">überfällig seit ' + shortDate(diff(e.datum)) + '</span>' : '';
     var priority = entryPriority(e);
     var meta = '<span class="kind">' + esc(e.art) + '</span>' + who(e.wer) + (opts.count ? '' : pill(priority) + overdue);
-    if (isUndatedTask(e)) meta += '<span>Aufgenommen ' + shortDate(diff(e.aufgenommen)) + '</span>';
+    if (isUndatedTask(e)) {
+      var wn = wdh(e);
+      meta += '<span>' + (wn ? 'Kehrt wieder' : 'Aufgenommen ' + shortDate(diff(e.aufgenommen))) + '</span>';
+      if (opts.check && window.TB_VARIANT !== 'pauline') {
+        meta += '<select class="wdh" data-id="' + esc(e.id) + '" aria-label="Wiederholen: ' + esc(e.titel) + '">' +
+          [[0, 'Einmalig'], [1, 'Täglich'], [2, 'Alle 2 Tage'], [3, 'Alle 3 Tage'], [7, 'Wöchentlich'], [14, 'Alle 2 Wochen'], [30, 'Monatlich']].map(function (o) {
+            return '<option value="' + o[0] + '"' + (o[0] === wn ? ' selected' : '') + '>' + (o[0] ? '↻ ' : '') + o[1] + '</option>';
+          }).join('') + '</select>';
+      }
+    }
     if (e.bis) meta += '<span>' + shortDate(diff(e.datum)) + ' bis ' + shortDate(diff(e.bis)) + '</span>';
     if (opts.count) {
       var n = diff(e.datum), lead = e.vorlauf != null ? e.vorlauf : 3, start = n - lead;
@@ -1027,6 +1058,14 @@ window.tagesblickInit = function () {
     $('akut').hidden = akut === 0;
   }
   $('today').addEventListener('change', function (ev) {
+    if (ev.target.classList.contains('wdh')) { /* Dropdown "Wiederholen" */
+      var wid = ev.target.getAttribute('data-id'), we = (D.eintraege || []).filter(function (x) { return x.id === wid; })[0], wk = 'wdh:' + wid, wv = Number(ev.target.value);
+      var wval = wv > 0 ? String(wv) : (we && Number(we.wiederholung) > 0 ? '0' : null);
+      if (ERL) ERL.set(wk, wval);
+      else { if (wval) doneSet[wk] = wval; else delete doneSet[wk]; store('pauline-erledigt', doneSet); }
+      renderLists();
+      return;
+    }
     var li = ev.target.closest('.item');
     li.classList.toggle('done', ev.target.checked);
     var id = ev.target.getAttribute('data-id');
