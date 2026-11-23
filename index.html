@@ -100,7 +100,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-2); 
 .wm .ers { position: relative; display: inline-block; font-style: normal; }
 .wm .ers i { font-style: normal; }
 .wm i.ex { font-style: normal; margin-left: .04em; }
-html.v-pauline [data-id="post"], html.v-pauline [data-id="melden"], html.v-pauline #shopBtn, html.v-pauline #ideenBtn, html.v-pauline #lGmail, html.v-pauline #lKal,
+html.v-pauline [data-id="post"], html.v-pauline [data-id="melden"], html.v-pauline #shopBtn, html.v-pauline #ideenBtn, html.v-pauline #bibBtn, html.v-pauline #bibO, html.v-pauline #bibR, html.v-pauline #lGmail, html.v-pauline #lKal,
 html.v-pauline #srcBtn, html.v-pauline #menuHelp, html.v-pauline #foot { display: none !important; }
 .wm .ers:last-of-type { margin-left: .14em; }
 .wm .alt { display: inline-block; transform: translateY(.36em) rotate(24deg); transform-origin: 50% 50%; opacity: .38; font-size: .9em; animation: wmfall 1.1s cubic-bezier(.45,0,.9,.55) .5s both; }
@@ -349,6 +349,44 @@ html.handy .shop-cat { font-size: .8em; margin-top: 18px; }
 .zr-file { position: relative; width: 64px; height: 64px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: grid; place-items: center; font-size: .72em; color: var(--muted); background: var(--panel, transparent); text-align: center; }
 .zr-file img { width: 100%; height: 100%; object-fit: cover; }
 .zr-file button { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border: 0; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; cursor: pointer; font-size: 11px; line-height: 20px; padding: 0; }
+/* Bibliothek: HTML-Bücher aus OneDrive (Dokumente/00_HTMLBooks), mit Lesezustand */
+#bibO { position: fixed; inset: 0; z-index: 60; display: none; overflow: auto; background: var(--bg); color: var(--ink); font-family: var(--body); }
+#bibO.open { display: block; }
+.bib-top { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.bib-top b { font-family: var(--display); font-size: 1.15em; color: var(--accent); margin-right: auto; }
+.bib-top input { flex: 1 1 160px; min-width: 120px; max-width: 320px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
+.bib-note { margin: 10px 16px 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-size: .9em; }
+.bib-note:empty { display: none; }
+.bib-note .btn { margin-left: 8px; }
+#bibResume { margin: 12px 16px 0; display: block; width: calc(100% - 32px); text-align: left; padding: 12px 14px; border: 1px solid var(--accent); border-radius: 10px; background: var(--panel-2); color: var(--ink); cursor: pointer; font: inherit; }
+#bibResume span { display: block; font-size: .8em; color: var(--accent); }
+#bibResume[hidden] { display: none; }
+.bib-shelf { margin: 18px 16px 0; }
+.bib-shelf h2 { margin: 0 0 8px; font-family: var(--display); font-size: 1.05em; color: var(--accent-2); }
+.bib-shelf h2 small { color: var(--muted); font-weight: 400; font-size: .75em; margin-left: 6px; }
+.bib-books { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.bib-book { position: relative; padding: 12px 14px 10px 20px; border: 1px solid var(--line); border-radius: 6px 12px 12px 6px; background: var(--panel); text-align: left; overflow: hidden; }
+.bib-book::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--c, var(--accent)); opacity: .85; }
+.bib-book .cat { font-size: .75em; color: var(--muted); }
+.bib-book h3 { margin: 2px 0 6px; font-size: .98em; line-height: 1.25; }
+.bib-book ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.bib-book li button, .bib-book > button { width: 100%; display: flex; gap: 6px; align-items: baseline; padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: .88em; text-align: left; cursor: pointer; }
+.bib-book li button:hover, .bib-book > button:hover { background: var(--panel-2); border-color: var(--line); }
+.bib-book li button i { font-style: normal; color: var(--muted); font-size: .85em; }
+.bib-book li button em, .bib-book > button em { margin-left: auto; font-style: normal; font-size: .78em; color: var(--accent); white-space: nowrap; }
+.bib-meta { margin-top: 6px; font-size: .72em; color: var(--muted); }
+.bib-empty { margin: 24px 16px; color: var(--muted); }
+#bibR { position: fixed; inset: 0; z-index: 61; display: none; grid-template-rows: auto minmax(0, 1fr); background: #fff; }
+#bibR.open { display: grid; }
+.bib-rbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid var(--line); color: var(--ink); }
+.bib-rbar .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9em; }
+.bib-rbar .pct { font-family: var(--mono); font-size: .8em; color: var(--accent); }
+#bibR.min .bib-rbar { display: none; }
+#bibR.min { grid-template-rows: minmax(0, 1fr); }
+#bibF { width: 100%; height: 100%; border: 0; background: #fff; }
+#bibPeek { position: fixed; right: 10px; top: 8px; z-index: 62; opacity: .55; }
+#bibLoad { position: fixed; inset: 0; z-index: 63; display: none; place-items: center; background: var(--bg); color: var(--muted); font-family: var(--mono); letter-spacing: .1em; }
+#bibLoad.open { display: grid; }
 .zr-pruef { margin: 4px 0 0; font-size: .85em; color: var(--accent); font-weight: 600; }
 .zr-att { display: inline-block; margin-top: 3px; font-size: .82em; color: var(--accent); }
 html.handy .zr-file { width: 84px; height: 84px; }
@@ -673,6 +711,7 @@ html[data-theme="ueberraschung"] .editbtn:hover, html[data-theme="ueberraschung"
         <a class="chip link" id="lKal" href="https://calendar.google.com/" target="_blank" rel="noopener">Kalender ↗</a>
         <button class="chip link shopbtn" type="button" id="shopBtn">🛒 Einkauf</button>
         <button class="chip link shopbtn" type="button" id="ideenBtn">💡 Ideen</button>
+        <button class="chip link shopbtn" type="button" id="bibBtn">📚 Bibliothek</button>
         <button class="chip link setsrc" type="button" id="srcBtn">Datenquelle</button>
         <span class="seg" role="group" aria-label="Ansicht der nächsten 14 Tage" hidden>
           <button type="button" id="vZeit" aria-pressed="true">Zeitleiste</button>
@@ -2196,6 +2235,222 @@ window.tagesblickInit = function () {
   };
 })();
 </script>
+<div id="bibO" role="dialog" aria-label="Bibliothek">
+  <div class="bib-top"><b>📚 Bibliothek</b><input id="bibQ" type="search" placeholder="Suchen …" aria-label="Bücher durchsuchen"><button class="btn" type="button" id="bibReload">Neu laden</button><button class="btn" type="button" id="bibClose">Schließen</button></div>
+  <p class="bib-note" id="bibNote"></p>
+  <button type="button" id="bibResume" hidden><span>Weiterlesen</span><b id="bibResumeT"></b></button>
+  <div id="bibShelves"><p class="bib-empty">Lade Bibliothek …</p></div>
+</div>
+<div id="bibR">
+  <div class="bib-rbar"><button class="btn" type="button" id="bibBack">← Bibliothek</button><span class="t" id="bibT"></span><span class="pct" id="bibPct"></span><button class="btn" type="button" id="bibPrev" aria-label="Vorheriges Kapitel">‹</button><button class="btn" type="button" id="bibNext" aria-label="Nächstes Kapitel">›</button><button class="btn" type="button" id="bibHide" aria-label="Leiste ausblenden">⌃</button></div>
+  <iframe id="bibF" title="Buch" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads"></iframe>
+</div>
+<button class="btn" type="button" id="bibPeek" hidden aria-label="Leiste einblenden">⌄</button>
+<div id="bibLoad">Öffne Buch …</div>
+<script>
+/* Bibliothek: zeigt die HTML-Bücher aus Dokumente/00_HTMLBooks (OneDrive) und merkt sich pro Kapitel die Leseposition.
+   Der Lesezustand liegt in lesezustand.json (Datei- und Kapitelname, Position in Prozent) und wird zwischen den Geräten abgeglichen. Keine Bücher in dieser Datei. */
+(function () {
+  if (window.TB_VARIANT === 'pauline') return;
+  var LISTK = 'pauline-bib-liste', STK = 'pauline-bib-zustand';
+  var $ = function (id) { return document.getElementById(id); };
+  function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
+  function jget(k, d) { try { return JSON.parse(ls(k) || 'null') || d; } catch (e) { return d; } }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function words(s) { return String(s).replace(/([a-zäöü])([A-ZÄÖÜ])/g, '$1 $2').replace(/([A-Z]{2,})([A-Z][a-z])/g, '$1 $2').replace(/_/g, ' '); }
+  function note(t, btn, fn) { var n = $('bibNote'); n.textContent = t || ''; if (t && btn) { var b = document.createElement('button'); b.className = 'btn'; b.type = 'button'; b.textContent = btn; b.onclick = fn; n.appendChild(b); } }
+
+  /* Lesezustand: { zuletzt: {name, zeit}, buecher: { <Dateiname>: { pos: 0..1, zeit, gelesen } } } */
+  var ZU = jget(STK, null) || { zuletzt: null, buecher: {} };
+  if (!ZU.buecher) ZU.buecher = {};
+  function merge(a, b) {
+    var o = { zuletzt: a.zuletzt, buecher: {} };
+    if (b.zuletzt && (!o.zuletzt || String(b.zuletzt.zeit) > String(o.zuletzt.zeit))) o.zuletzt = b.zuletzt;
+    [a.buecher || {}, b.buecher || {}].forEach(function (m) {
+      Object.keys(m).forEach(function (k) {
+        var x = m[k], y = o.buecher[k];
+        if (!y || String(x.zeit) > String(y.zeit)) o.buecher[k] = { pos: x.pos, zeit: x.zeit, gelesen: !!(x.gelesen || (y && y.gelesen)) };
+        else if (x.gelesen) y.gelesen = true;
+      });
+    });
+    return o;
+  }
+  var dirty = false, pushT = null;
+  function saveLocal() { ls(STK, JSON.stringify(ZU)); }
+  function pushLater(sofort) {
+    dirty = true; clearTimeout(pushT);
+    pushT = setTimeout(function () {
+      var io = window.TB_BIB_IO; if (!io || !dirty) return;
+      dirty = false;
+      io.zustand.apply(function (o) { var m = merge(o, ZU); o.zuletzt = m.zuletzt; o.buecher = m.buecher; }).then(function (o) { ZU = merge(ZU, o); saveLocal(); })
+        .catch(function () { dirty = true; });
+    }, sofort ? 200 : 4000);
+  }
+  function pullState() {
+    var io = window.TB_BIB_IO; if (!io) return Promise.resolve();
+    return io.zustand.load().then(function (o) { ZU = merge(ZU, o); saveLocal(); render(); }).catch(function () {});
+  }
+  function setPos(pos) {
+    if (!current) return;
+    pos = Math.max(0, Math.min(1, pos));
+    var prev = ZU.buecher[current.name] || {};
+    var now = new Date().toISOString();
+    ZU.buecher[current.name] = { pos: pos, zeit: now, gelesen: !!(prev.gelesen || pos >= 0.95) };
+    ZU.zuletzt = { name: current.name, zeit: now };
+    $('bibPct').textContent = Math.round(pos * 100) + ' %';
+    saveLocal(); pushLater(false);
+  }
+  function stand(b) {
+    var s = ZU.buecher[b.name]; if (!s) return '';
+    if (s.gelesen && s.pos >= 0.95) return '✓ gelesen';
+    return s.pos >= 0.02 ? Math.round(s.pos * 100) + ' %' : '';
+  }
+
+  /* Dateiname: quelle_001_Fachbibliothek_002_Kategorie_001_Thema[_001_Kapitel].html */
+  function parse(f) {
+    var base = f.name.replace(/\.html?$/i, ''), p = base.split('_'), src = /^(chatgpt|claude|gemini)$/i.test(p[0]) ? p.shift().toLowerCase() : '';
+    var lv = [];
+    for (var i = 0; i + 1 < p.length; i += 2) { if (!/^\d{3}$/.test(p[i])) break; lv.push({ nr: p[i], name: p[i + 1] }); }
+    if (lv.length < 3) return { id: f.id, name: f.name, src: src, bib: 'Sonstiges', bibNr: '999', kat: '', thema: words(base), kapitel: null, f: f };
+    return { id: f.id, name: f.name, src: src, f: f, bibNr: lv[0].nr, bib: words(lv[0].name), katNr: lv[1].nr, kat: words(lv[1].name), themaNr: lv[2].nr, thema: words(lv[2].name), kapNr: lv[3] ? lv[3].nr : null, kapitel: lv[3] ? words(lv[3].name) : null };
+  }
+  var ALL = [], BOOKS = [], current = null, blobUrl = null;
+  function build(files) {
+    ALL = files.filter(function (f) { return f.file && /\.html?$/i.test(f.name); }).map(parse);
+    var map = {};
+    ALL.forEach(function (b) {
+      var key = [b.src, b.bibNr, b.bib, b.katNr, b.kat, b.themaNr, b.thema].join('|');
+      (map[key] = map[key] || { src: b.src, bib: b.bib, bibNr: b.bibNr, kat: b.kat, katNr: b.katNr || '', thema: b.thema, themaNr: b.themaNr || '', items: [] }).items.push(b);
+    });
+    BOOKS = Object.keys(map).map(function (k) { var x = map[k]; x.items.sort(function (a, b) { return String(a.kapNr || '').localeCompare(String(b.kapNr || '')); }); return x; });
+    BOOKS.sort(function (a, b) { return (a.bibNr + a.katNr + a.themaNr + a.src).localeCompare(b.bibNr + b.katNr + b.themaNr + b.src); });
+    render();
+  }
+  function fmtDate(s) { var d = new Date(s); return isNaN(d) ? '' : d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  function render() {
+    var q = $('bibQ').value.trim().toLowerCase();
+    var list = BOOKS.filter(function (b) { return !q || (b.bib + ' ' + b.kat + ' ' + b.thema + ' ' + b.items.map(function (i) { return i.kapitel || ''; }).join(' ') + ' ' + b.src).toLowerCase().indexOf(q) >= 0; });
+    if (!list.length) { $('bibShelves').innerHTML = '<p class="bib-empty">' + (BOOKS.length ? 'Nichts gefunden.' : 'Keine HTML-Bücher im Ordner gefunden.') + '</p>'; }
+    else {
+      var html = '', bib = null;
+      list.forEach(function (b) {
+        if (b.bib !== bib) {
+          if (bib !== null) html += '</div></section>';
+          var n = list.filter(function (x) { return x.bib === b.bib; }).length;
+          html += '<section class="bib-shelf"><h2>' + esc(b.bib) + '<small>' + n + (n === 1 ? ' Buch' : ' Bücher') + '</small></h2><div class="bib-books">';
+          bib = b.bib;
+        }
+        var latest = b.items.reduce(function (m, x) { return x.f.lastModifiedDateTime > m ? x.f.lastModifiedDateTime : m; }, '');
+        var col = b.src === 'chatgpt' ? 'var(--accent-2)' : 'var(--accent)';
+        var multi = b.items.length > 1 || b.items[0].kapitel;
+        html += '<div class="bib-book" style="--c:' + col + '">' + (b.kat ? '<div class="cat">' + esc(b.kat) + '</div>' : '') + '<h3>' + esc(b.thema) + '</h3>' +
+          (multi ? '<ul>' + b.items.map(function (x) { return '<li><button type="button" data-open="' + esc(x.id) + '"><i>' + esc(x.kapNr || '') + '</i>' + esc(x.kapitel || x.thema) + '<em>' + esc(stand(x)) + '</em></button></li>'; }).join('') + '</ul>'
+            : '<button type="button" data-open="' + esc(b.items[0].id) + '">Öffnen<em>' + esc(stand(b.items[0])) + '</em></button>') +
+          '<div class="bib-meta">' + esc(b.src || 'Buch') + ' · ' + esc(fmtDate(latest)) + (b.items.length > 1 ? ' · ' + b.items.length + ' Kapitel' : '') + '</div></div>';
+      });
+      $('bibShelves').innerHTML = html + '</div></section>';
+    }
+    var lb = ZU.zuletzt && ALL.filter(function (x) { return x.name === ZU.zuletzt.name; })[0];
+    $('bibResume').hidden = !lb;
+    if (lb) $('bibResumeT').textContent = lb.thema + (lb.kapitel ? ' · ' + lb.kapitel : '') + (stand(lb) ? ' · ' + stand(lb) : '');
+  }
+
+  /* Lesen: Das Buch bekommt ein kleines Skript, das die Position meldet und beim Öffnen wiederherstellt. */
+  function inject(html, pos) {
+    var s = '<script>(function(){var P=' + (+pos || 0) + ',se=function(){return document.scrollingElement||document.documentElement},mx=function(){var e=se();return Math.max(1,e.scrollHeight-e.clientHeight)};' +
+      'function go(){if(P>0)se().scrollTop=P*mx()}addEventListener("load",function(){go();setTimeout(go,300);setTimeout(go,1200)});' +
+      'var t,ok=false;setTimeout(function(){ok=true},1500);function send(){parent.postMessage({tbBib:1,pos:se().scrollTop/mx()},"*")}' +
+      'addEventListener("scroll",function(){if(!ok)return;clearTimeout(t);t=setTimeout(send,500)},{passive:true});addEventListener("pagehide",function(){if(ok)send()});})();<\/script>';
+    var i = html.toLowerCase().lastIndexOf('</body>');
+    return i < 0 ? html + s : html.slice(0, i) + s + html.slice(i);
+  }
+  var cacheP = ('caches' in window) ? caches.open('merkes-buecher').catch(function () { return null; }) : Promise.resolve(null);
+  function loadBook(b) {
+    var io = window.TB_BIB_IO; if (!io) return Promise.reject(new Error('nicht angemeldet'));
+    return cacheP.then(function (cache) {
+      var key = 'https://buecher.local/' + encodeURIComponent(b.id) + '?v=' + encodeURIComponent(b.f.lastModifiedDateTime || '');
+      return (cache ? cache.match(key) : Promise.resolve(null)).then(function (hit) {
+        if (hit) return hit.arrayBuffer();
+        return io.file(b.id).then(function (buf) {
+          if (cache) cache.put(key, new Response(buf.slice(0), { headers: { 'Content-Type': 'text/html;charset=utf-8' } })).catch(function () {});
+          return buf;
+        });
+      });
+    });
+  }
+  function siblings(b) { return ALL.filter(function (x) { return x.src === b.src && x.bib === b.bib && x.kat === b.kat && x.thema === b.thema; }).sort(function (a, c) { return String(a.kapNr || '').localeCompare(String(c.kapNr || '')); }); }
+  function openBook(id, push) {
+    var b = ALL.filter(function (x) { return x.id === id; })[0]; if (!b) return;
+    $('bibLoad').classList.add('open');
+    loadBook(b).then(function (buf) {
+      var pos = (ZU.buecher[b.name] || {}).pos || 0;
+      var html = inject(new TextDecoder('utf-8').decode(buf), pos >= 0.95 ? 0 : pos);
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+      current = b;
+      $('bibF').src = blobUrl;
+      $('bibT').textContent = b.thema + (b.kapitel ? ' · ' + b.kapitel : '');
+      $('bibPct').textContent = pos >= 0.02 && pos < 0.95 ? Math.round(pos * 100) + ' %' : '';
+      var sib = siblings(b), i = sib.indexOf(b);
+      $('bibPrev').hidden = i <= 0; $('bibNext').hidden = i < 0 || i >= sib.length - 1;
+      $('bibR').classList.add('open'); $('bibR').classList.remove('min'); $('bibPeek').hidden = true;
+      if (push) history.pushState({ bib: 'book' }, '', '#lesen');
+      var s = ZU.buecher[b.name] || { pos: 0, gelesen: false };
+      ZU.buecher[b.name] = { pos: s.pos || 0, zeit: new Date().toISOString(), gelesen: !!s.gelesen };
+      ZU.zuletzt = { name: b.name, zeit: ZU.buecher[b.name].zeit };
+      saveLocal(); pushLater(false);
+    }).catch(function (e) {
+      note('Das Buch konnte nicht geladen werden (' + ((e && e.message) || 'Fehler') + ').');
+    }).then(function () { $('bibLoad').classList.remove('open'); });
+  }
+  function closeBookUi() {
+    $('bibR').classList.remove('open', 'min'); $('bibPeek').hidden = true; $('bibF').src = 'about:blank'; current = null; render();
+    if (dirty) pushLater(true);
+  }
+  function step(d) { if (!current) return; var sib = siblings(current), i = sib.indexOf(current); if (sib[i + d]) { history.replaceState({ bib: 'book' }, '', '#lesen'); openBook(sib[i + d].id, false); } }
+  window.addEventListener('message', function (ev) {
+    var d = ev.data;
+    if (!current || ev.source !== $('bibF').contentWindow || !d || d.tbBib !== 1 || typeof d.pos !== 'number' || !isFinite(d.pos)) return;
+    setPos(d.pos);
+  });
+
+  /* Liste laden: zuerst der gemerkte Stand, dann OneDrive */
+  function refresh() {
+    var io = window.TB_BIB_IO;
+    if (!io) { note('Die Bibliothek braucht die Anmeldung bei OneDrive. Melde dich oben über „Datenquelle“ an.'); return Promise.resolve(); }
+    note('');
+    return io.list().then(function (files) {
+      var slim = files.map(function (f) { return { id: f.id, name: f.name, size: f.size, lastModifiedDateTime: f.lastModifiedDateTime, file: f.file ? {} : null }; });
+      ls(LISTK, JSON.stringify(slim)); build(slim);
+    }).catch(function (e) { note('Die Liste konnte nicht geladen werden (' + ((e && (e.errorCode || e.message)) || 'Fehler') + '). Gezeigt wird der zuletzt geladene Stand.'); });
+  }
+  var offen = false;
+  function openLib(push) {
+    offen = true; $('bibO').classList.add('open'); document.documentElement.style.overflow = 'hidden';
+    if (push) history.pushState({ bib: 'lib' }, '', '#bibliothek');
+    var c = jget(LISTK, null); if (c && !BOOKS.length) build(c); else render();
+    refresh().then(pullState);
+  }
+  function closeLibUi() { offen = false; $('bibO').classList.remove('open'); document.documentElement.style.overflow = ''; }
+  $('bibBtn').addEventListener('click', function () { openLib(true); });
+  $('bibClose').addEventListener('click', function () { var s = history.state && history.state.bib; closeLibUi(); if (s === 'lib') history.back(); });
+  $('bibBack').addEventListener('click', function () { var s = history.state && history.state.bib; closeBookUi(); if (s === 'book') history.back(); });
+  window.addEventListener('popstate', function (ev) {
+    var s = ev.state && ev.state.bib;
+    if ($('bibR').classList.contains('open') && s !== 'book') closeBookUi();
+    if (offen && !s) closeLibUi();
+  });
+  $('bibReload').addEventListener('click', function () { refresh().then(pullState); });
+  $('bibQ').addEventListener('input', render);
+  $('bibShelves').addEventListener('click', function (ev) { var t = ev.target.closest('[data-open]'); if (t) openBook(t.getAttribute('data-open'), true); });
+  $('bibResume').addEventListener('click', function () { var lb = ZU.zuletzt && ALL.filter(function (x) { return x.name === ZU.zuletzt.name; })[0]; if (lb) openBook(lb.id, true); });
+  $('bibPrev').addEventListener('click', function () { step(-1); });
+  $('bibNext').addEventListener('click', function () { step(1); });
+  $('bibHide').addEventListener('click', function () { $('bibR').classList.add('min'); $('bibPeek').hidden = false; });
+  $('bibPeek').addEventListener('click', function () { $('bibR').classList.remove('min'); $('bibPeek').hidden = true; });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && dirty) pushLater(true); });
+})();
+</script>
 <script>
 /* Datenquelle: Auf Handy und Tablet meldet sich die Seite bei Microsoft an und liest daten.js aus dem eigenen OneDrive.
    Abgehakte Einträge werden in erledigt.json im selben Ordner gespeichert, damit alle Geräte denselben Stand zeigen.
@@ -2501,6 +2756,43 @@ window.tagesblickInit = function () {
           return p;
         }
       };
+      /* Bibliothek: Bücher aus Dokumente/00_HTMLBooks lesen, Lesezustand in lesezustand.json (neben daten.js) */
+      if (!V) {
+        var BIBDIR = ['Dokumente/00_HTMLBooks', 'Documents/00_HTMLBooks'], bibLauf = Promise.resolve();
+        var bibListe = function (tok, i) {
+          return fetch('https://graph.microsoft.com/v1.0/me/drive/root:/' + BIBDIR[i] + ':/children?$select=id,name,size,lastModifiedDateTime,file&$top=999', { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store' })
+            .then(function (r) { if (r.status === 404 && i + 1 < BIBDIR.length) return bibListe(tok, i + 1); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (j) { return j.value || j; });
+        };
+        var ladeZustand = function (tok) {
+          return fetch(url('lesezustand.json'), { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store' })
+            .then(function (r) { if (r.status === 404) return {}; if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (o) { o = (o && typeof o === 'object') ? o : {}; if (!o.buecher || typeof o.buecher !== 'object') o.buecher = {}; if (!('zuletzt' in o)) o.zuletzt = null; return o; });
+        };
+        window.TB_BIB_IO = {
+          list: function () { return token().then(function (tok) { return bibListe(tok, 0); }); },
+          file: function (id) {
+            return token().then(function (tok) { return fetch('https://graph.microsoft.com/v1.0/me/drive/items/' + encodeURIComponent(id) + '/content', { headers: { Authorization: 'Bearer ' + tok } }); })
+              .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
+          },
+          zustand: {
+            load: function () { return token().then(ladeZustand); },
+            apply: function (fn) {
+              var p = bibLauf.then(function () {
+                return token().then(function (tok) {
+                  return ladeZustand(tok).then(function (o) {
+                    fn(o);
+                    return fetch(url('lesezustand.json'), { method: 'PUT', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify(o, null, 1) })
+                      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return o; });
+                  });
+                });
+              });
+              bibLauf = p.catch(function () {});
+              return p;
+            }
+          }
+        };
+      }
       app.initialize().then(function () { return app.handleRedirectPromise(); }).then(function (res) {
         account = (res && res.account) || app.getAllAccounts()[0];
         if (!account) { window.TB_ERL = mkErl(null, null, localMap()); return start(cached() || EMPTY, 'Noch nicht angemeldet.', 'Bei Microsoft anmelden', login); }
