@@ -498,6 +498,12 @@ h2 { font-size: 15px; letter-spacing: .02em; }
 .meta { font-size: 11.5px; margin-top: 2px; gap: 2px 8px; }
 select.wdh { font: inherit; font-size: 11.5px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 1px 4px; }
 select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
+.bereich { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; color: var(--accent-2); }
+.schritte { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.schritte label { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.schritte li.sdone span { text-decoration: line-through; color: var(--muted); }
+.schritte-n { font-size: 11.5px; color: var(--muted); }
+.ruht { margin: 10px 4px 0; font-size: 12.5px; color: var(--muted); }
 .btn.aufb { font-size: 11.5px; padding: 1px 8px; }
 #aufD { max-width: min(440px, 92vw); }
 #aufD h3 { margin: 0 0 10px; }
@@ -744,7 +750,7 @@ html[data-theme="ueberraschung"] .editbtn:hover, html[data-theme="ueberraschung"
     <div class="tl" id="timeline" role="group" aria-label="Die nächsten 14 Tage"></div>
 
     <div class="mods" id="mods">
-      <section class="mod w2" data-id="heute" data-title="Heute" data-note-id="todayDate"><div class="mbody"><ul class="items" id="today"></ul></div></section>
+      <section class="mod w2" data-id="heute" data-title="Heute" data-note-id="todayDate"><div class="mbody"><ul class="items" id="today"></ul><p class="ruht" id="ruhtNote" hidden></p></div></section>
       <section class="mod" data-id="radar" data-title="Radar" data-note="14 Tage" hidden><div class="mbody"><div id="radar"></div><div class="legend" id="legend"></div></div></section>
       <section class="mod" data-id="morgen" data-title="Morgen im Blick" data-note-id="tomorrowDate"><div class="mbody"><ul class="items" id="tomorrow"></ul></div></section>
       <section class="mod" data-id="kommend" data-title="Rückt näher" data-note-id="aheadCount"><div class="mbody"><ul class="items" id="ahead"></ul></div></section>
@@ -951,7 +957,25 @@ window.tagesblickInit = function () {
     return false;
   }
   function byTime(a, b) { return String(a.zeit || '99:99').localeCompare(String(b.zeit || '99:99')); }
-  function isUndatedTask(e) { return e.art === 'Aufgabe' && e.aufgenommen && !e.datum; }
+  /* Wichtigkeit (1 Irgendwann, 2 Wichtig, 3 Kritisch), Zeitfenster und Schritte */
+  function wicht(e) { var w = Number(e.wichtig); return w >= 1 && w <= 3 ? Math.floor(w) : 0; }
+  function winInfo(e) {
+    if (!e.fenster || !ISODATE.test(e.fenster.von || '') || !ISODATE.test(e.fenster.bis || '')) return null;
+    var a = diff(e.fenster.von), b = diff(e.fenster.bis), total = b - a;
+    return { a: a, b: b, rest: b, state: b < 0 ? 'over' : a > 0 ? 'before' : 'in', f: a > 0 ? 0 : (total <= 0 ? 1 : -a / total) };
+  }
+  var WSCHWELLE = { 1: 0.67, 2: 0.4, 3: 0 };
+  /* Zeitfenster: erscheint unter Heute, wenn es überschritten ist oder je nach Wichtigkeit genug vom Fenster vorbei ist */
+  function winShown(e) { var w = winInfo(e); return !!w && !isDone(e) && (w.state === 'over' || (w.state === 'in' && w.f >= WSCHWELLE[wicht(e) || 2])); }
+  function isUndatedTask(e) { return e.art === 'Aufgabe' && e.aufgenommen && !e.datum && !winInfo(e); }
+  /* Ruht: Irgendwann-Aufgaben ohne Frist und noch nicht dran stehen nicht unter Heute, bis sie 7 Tage offen sind */
+  function ruht(e) {
+    if (isDone(e)) return false;
+    var w = winInfo(e); if (w) return !winShown(e);
+    return isUndatedTask(e) && wicht(e) === 1 && !wdh(e) && taskAge(e) < 7;
+  }
+  function stepBase(e) { var n = wdh(e), v = doneSet[e.id]; return n && typeof v === 'string' && ISODATE.test(v) ? addIso(v, n) : ''; }
+  function stepDone(e, st) { var v = doneSet[e.id + '#' + st.id], b = stepBase(e); return !!v && (!b || typeof v !== 'string' || !ISODATE.test(v) || v >= b); }
   function taskAge(e) {
     var base = e.aufgenommen, n = wdh(e), v = doneSet[e.id];
     if (n && typeof v === 'string' && ISODATE.test(v) && addIso(v, n) > base) base = addIso(v, n); /* zählt ab dem Tag, an dem sie wieder fällig wurde */
@@ -970,16 +994,22 @@ window.tagesblickInit = function () {
     return { stufe: age >= 7 ? 'akut' : age >= 3 ? 'bald' : 'ruhig',
       text: lvl + ' · seit ' + age + ' ' + (age === 1 ? 'Tag' : 'Tagen') + ' offen' + (n ? ' · ' + n + '× ohne Grund aufgeschoben' : '') + (si.m ? ' · ' + si.m + '× mit Grund' : '') };
   }
-  function entryPriority(e) { return isUndatedTask(e) && !isDone(e) ? taskPriority(e) : e.pill; }
+  function entryPriority(e) {
+    var w = winInfo(e);
+    if (w && !isDone(e)) return w.state === 'over' ? { stufe: 'akut', text: 'Zeitfenster überschritten seit ' + (-w.b) + ' ' + (w.b === -1 ? 'Tag' : 'Tagen') }
+      : { stufe: w.f >= 0.67 ? 'bald' : 'ruhig', text: 'Zeitfenster bis ' + shortDate(w.b) + ' · noch ' + w.b + ' ' + (w.b === 1 ? 'Tag' : 'Tage') };
+    return isUndatedTask(e) && !isDone(e) ? taskPriority(e) : e.pill;
+  }
   var OVERDUE = ['Aufgabe', 'E-Mail', 'Vorsorge', 'Arbeit', 'Schulung'];
   var E = (D.eintraege || []).map(function (e, i) { e._i = i; return e; });
   /* Ganztägige Termine (Termin oder Anlass mit Datum, ohne Uhrzeit) sind keine Einträge, sondern Merkmale eines Tages. Sie stehen im Kopf der Liste. */
   function isAllDay(e) { return !!(e.datum && !e.zeit && (e.art === 'Termin' || e.art === 'Anlass')); }
   var todayList = E.filter(function (e) { return !isAllDay(e) && (occurs(e, 0) || isUndatedTask(e)); });
   E.forEach(function (e) { if (e.datum && diff(e.datum) < 0 && !isDone(e) && OVERDUE.indexOf(e.art) >= 0) todayList.push(e); });
+  E.forEach(function (e) { if (winInfo(e) && (winShown(e) || (isDone(e) && winInfo(e).state === 'in'))) todayList.push(e); });
   todayList = todayList.filter(function (e, i, a) { return a.indexOf(e) === i && !doneEarlier(e); }).sort(function (a, b) {
     return byTime(a, b) || Number(!!isUndatedTask(a)) - Number(!!isUndatedTask(b)) ||
-      (isUndatedTask(a) && isUndatedTask(b) ? taskAge(b) - taskAge(a) : 0);
+      (isUndatedTask(a) && isUndatedTask(b) ? (wicht(b) - wicht(a)) || taskAge(b) - taskAge(a) : 0);
   });
   var tomorrowList = E.filter(function (e) { return !isAllDay(e) && occurs(e, 1); }).sort(byTime);
   /* Wie eine Sekretärin: bis 14 Tage vorher steht alles hier, Dinge mit langem Vorlauf (Arzt, Schulung) ab ihrem Erinnerungstag. */
@@ -1019,7 +1049,9 @@ window.tagesblickInit = function () {
       : e.zeit ? '<span class="when">' + esc(e.zeit) + '</span>' : '<span class="when none">––:––</span>';
     var overdue = opts.check && e.datum && diff(e.datum) < 0 ? '<span class="pill akut">überfällig seit ' + shortDate(diff(e.datum)) + '</span>' : '';
     var priority = entryPriority(e);
-    var meta = '<span class="kind">' + esc(e.art) + '</span>' + who(e.wer) + (opts.count ? '' : pill(priority) + overdue);
+    var meta = '<span class="kind">' + esc(e.art) + '</span>' + who(e.wer) +
+      (opts.count ? '' : (e.bereich ? '<span class="bereich">' + esc(e.bereich) + '</span>' : '') +
+        (wicht(e) === 3 ? '<span class="pill akut">Kritisch</span>' : wicht(e) === 1 ? '<span class="pill info">Irgendwann</span>' : '') + pill(priority) + overdue);
     if (isUndatedTask(e)) {
       var wn = wdh(e);
       meta += '<span>' + (wn ? 'Kehrt wieder' : 'Aufgenommen ' + shortDate(diff(e.aufgenommen))) + '</span>';
@@ -1037,6 +1069,13 @@ window.tagesblickInit = function () {
       meta += start <= 0 ? '<span class="pill ruhig">Erinnerung läuft</span>' : '<span class="pill info">Erinnerung ab ' + shortDate(start) + '</span>';
     }
     var prep = e.vorbereitung && e.vorbereitung.length ? '<div class="prep">' + e.vorbereitung.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '</div>' : '';
+    if (opts.check && e.schritte && e.schritte.length) {
+      var sd = e.schritte.filter(function (st) { return stepDone(e, st); }).length;
+      prep += '<div class="schritte-n">Schritte: ' + sd + ' von ' + e.schritte.length + '</div><ul class="schritte">' + e.schritte.map(function (st) {
+        var on = stepDone(e, st);
+        return '<li' + (on ? ' class="sdone"' : '') + '><label><input type="checkbox" data-step="' + esc(e.id + '#' + st.id) + '"' + (on ? ' checked' : '') + ' aria-label="Schritt: ' + esc(st.titel) + '"><span>' + esc(st.titel) + '</span></label></li>';
+      }).join('') + '</ul>';
+    }
     var done = isDone(e);
     var side = opts.check && !e.hinweis ? '<input type="checkbox" id="chk-' + esc(e.id) + '" data-id="' + esc(e.id) + '"' + (priority && priority.stufe === 'akut' ? ' data-akut="1"' : '') + (done ? ' checked' : '') + ' aria-label="Erledigt: ' + esc(e.titel) + '">' : '';
     return '<li class="item' + (done ? ' done' : '') + '" data-who="' + esc(e.wer) + '">' + when +
@@ -1080,20 +1119,28 @@ window.tagesblickInit = function () {
   }
   function renderLists() {
     paintAttrs('heute', 0); paintAttrs('morgen', 1);
-    $('today').innerHTML = todayList.filter(function (e) { return !snoozed(e); }).map(function (e) { return item(e, { check: true }); }).join('');
+    $('today').innerHTML = todayList.filter(function (e) { return !snoozed(e) && !ruht(e); }).map(function (e) { return item(e, { check: true }); }).join('');
+    var wartend = E.filter(function (e) { return e.art === 'Aufgabe' && !e.erledigt && ruht(e); });
+    var rn = $('ruhtNote'); if (rn) { rn.hidden = !wartend.length; rn.textContent = wartend.length ? 'Ruht, noch nicht dran: ' + wartend.map(function (e) { var w = winInfo(e); return e.titel + (w ? ' (bis ' + shortDate(w.b) + ')' : ' (Irgendwann)'); }).join(' · ') : ''; }
     $('tomorrow').innerHTML = tomorrowList.map(function (e) { return item(e, {}); }).join('');
     $('ahead').innerHTML = aheadList.map(function (e) { return item(e, { count: true }); }).join('');
     updateOpen();
     applyFilter();
   }
   function updateOpen() {
-    var left = $('today').querySelectorAll('input:not(:checked)').length;
+    var left = $('today').querySelectorAll('input[data-id]:not(:checked)').length;
     var akut = $('today').querySelectorAll('input[data-akut]:not(:checked)').length;
     $('open').textContent = left === 0 ? 'Alles erledigt' : left + ' offen';
     $('akut').textContent = akut + ' akut';
     $('akut').hidden = akut === 0;
   }
   $('today').addEventListener('change', function (ev) {
+    if (ev.target.hasAttribute('data-step')) { /* Schritt einer Aufgabe */
+      var sk2 = ev.target.getAttribute('data-step'), sv = ev.target.checked ? TODAY_ISO : null;
+      if (ERL) ERL.set(sk2, sv); else { if (sv) doneSet[sk2] = sv; else delete doneSet[sk2]; store('pauline-erledigt', doneSet); }
+      renderLists(); updateOpen();
+      return;
+    }
     if (ev.target.classList.contains('wdh')) { /* Dropdown "Wiederholen" */
       var wid = ev.target.getAttribute('data-id'), we = (D.eintraege || []).filter(function (x) { return x.id === wid; })[0], wk = 'wdh:' + wid;
       var wv = Number(ev.target.value);
