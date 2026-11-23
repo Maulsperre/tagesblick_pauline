@@ -929,10 +929,17 @@ window.tagesblickInit = function () {
     if (n && typeof v === 'string' && ISODATE.test(v) && addIso(v, n) > base) base = addIso(v, n); /* zählt ab dem Tag, an dem sie wieder fällig wurde */
     return Math.max(0, -diff(base));
   }
+  /* Aufschieben ohne Grund: Die Aufgabe verschwindet für N Tage, ihr Alter läuft aber weiter. Jeder Aufschub wird gezählt und die Priorität steigt immer weiter. */
+  function snzInfo(e) {
+    var v = doneSet['snz:' + e.id]; if (!v) return { bis: '', n: 0 };
+    var p = String(v).split('|'); return { bis: ISODATE.test(p[0]) ? p[0] : '', n: Number(p[1]) || 0 };
+  }
+  function snoozed(e) { var s = snzInfo(e); return !!s.bis && TODAY_ISO < s.bis && !isDone(e); }
   function taskPriority(e) {
-    var age = taskAge(e);
+    var age = taskAge(e), n = snzInfo(e).n;
+    var lvl = age >= 21 ? 'Nicht mehr aufschiebbar' : age >= 14 ? 'Dringend' : age >= 7 ? 'Hohe Priorität' : age >= 3 ? 'Erhöhte Priorität' : 'Normale Priorität';
     return { stufe: age >= 7 ? 'akut' : age >= 3 ? 'bald' : 'ruhig',
-      text: (age >= 7 ? 'Hohe Priorität' : age >= 3 ? 'Erhöhte Priorität' : 'Normale Priorität') + ' · seit ' + age + ' ' + (age === 1 ? 'Tag' : 'Tagen') + ' offen' };
+      text: lvl + ' · seit ' + age + ' ' + (age === 1 ? 'Tag' : 'Tagen') + ' offen' + (n ? ' · ' + n + '× ohne Grund aufgeschoben' : '') };
   }
   function entryPriority(e) { return isUndatedTask(e) && !isDone(e) ? taskPriority(e) : e.pill; }
   var OVERDUE = ['Aufgabe', 'E-Mail', 'Vorsorge', 'Arbeit', 'Schulung'];
@@ -989,9 +996,11 @@ window.tagesblickInit = function () {
       meta += '<span>' + (wn ? 'Kehrt wieder' : 'Aufgenommen ' + shortDate(diff(e.aufgenommen))) + '</span>';
       if (opts.check && window.TB_VARIANT !== 'pauline') {
         meta += '<select class="wdh" data-id="' + esc(e.id) + '" aria-label="Wiederholen: ' + esc(e.titel) + '">' +
-          [[0, 'Einmalig'], [1, 'Täglich'], [2, 'Alle 2 Tage'], [3, 'Alle 3 Tage'], [7, 'Wöchentlich'], [14, 'Alle 2 Wochen'], [30, 'Monatlich']].map(function (o) {
+          '<optgroup label="Wiederholen">' + [[0, 'Einmalig'], [1, 'Täglich'], [2, 'Alle 2 Tage'], [3, 'Alle 3 Tage'], [7, 'Wöchentlich'], [14, 'Alle 2 Wochen'], [30, 'Monatlich']].map(function (o) {
             return '<option value="' + o[0] + '"' + (o[0] === wn ? ' selected' : '') + '>' + (o[0] ? '↻ ' : '') + o[1] + '</option>';
-          }).join('') + '</select>';
+          }).join('') + '</optgroup><optgroup label="Aufschieben ohne Grund">' + [1, 2, 3, 7, 14].map(function (n) {
+            return '<option value="s' + n + '">' + n + '*</option>';
+          }).join('') + '</optgroup></select>';
       }
     }
     if (e.bis) meta += '<span>' + shortDate(diff(e.datum)) + ' bis ' + shortDate(diff(e.bis)) + '</span>';
@@ -1044,7 +1053,7 @@ window.tagesblickInit = function () {
   }
   function renderLists() {
     paintAttrs('heute', 0); paintAttrs('morgen', 1);
-    $('today').innerHTML = todayList.map(function (e) { return item(e, { check: true }); }).join('');
+    $('today').innerHTML = todayList.filter(function (e) { return !snoozed(e); }).map(function (e) { return item(e, { check: true }); }).join('');
     $('tomorrow').innerHTML = tomorrowList.map(function (e) { return item(e, {}); }).join('');
     $('ahead').innerHTML = aheadList.map(function (e) { return item(e, { count: true }); }).join('');
     updateOpen();
@@ -1059,7 +1068,14 @@ window.tagesblickInit = function () {
   }
   $('today').addEventListener('change', function (ev) {
     if (ev.target.classList.contains('wdh')) { /* Dropdown "Wiederholen" */
-      var wid = ev.target.getAttribute('data-id'), we = (D.eintraege || []).filter(function (x) { return x.id === wid; })[0], wk = 'wdh:' + wid, wv = Number(ev.target.value);
+      var wid = ev.target.getAttribute('data-id'), we = (D.eintraege || []).filter(function (x) { return x.id === wid; })[0], wk = 'wdh:' + wid;
+      if (/^s\d+$/.test(ev.target.value)) { /* Aufschieben ohne Grund: N Tage weg, Alter und Zähler laufen weiter */
+        var sk = 'snz:' + wid, sn = snzInfo(we || { id: wid }).n + 1, sval = addIso(TODAY_ISO, Number(ev.target.value.slice(1))) + '|' + sn;
+        if (ERL) ERL.set(sk, sval); else { doneSet[sk] = sval; store('pauline-erledigt', doneSet); }
+        renderLists(); updateOpen();
+        return;
+      }
+      var wv = Number(ev.target.value);
       var wval = wv > 0 ? String(wv) : (we && Number(we.wiederholung) > 0 ? '0' : null);
       if (ERL) ERL.set(wk, wval);
       else { if (wval) doneSet[wk] = wval; else delete doneSet[wk]; store('pauline-erledigt', doneSet); }
