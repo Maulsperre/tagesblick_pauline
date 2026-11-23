@@ -504,6 +504,11 @@ select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
 .schritte li.sdone span { text-decoration: line-through; color: var(--muted); }
 .schritte-n { font-size: 11.5px; color: var(--muted); }
 .ruht { margin: 10px 4px 0; font-size: 12.5px; color: var(--muted); }
+/* Wichtigkeit sofort sichtbar: Kritisch / Extrem wichtig mit rotem Rahmen, Wichtig und lange Offenes mit Bronze-Balken */
+.item.lvl3 { border: 2px solid var(--akut); border-radius: 10px; padding: 10px 10px; margin: 8px 0; background: color-mix(in srgb, var(--akut) 10%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--akut) 16%, transparent); }
+.item.lvl3 .title { font-weight: 700; }
+.item.lvl2 { border: 0; border-left: 4px solid var(--bald); border-radius: 6px; padding: 8px 10px; margin: 4px 0; background: color-mix(in srgb, var(--bald) 8%, transparent); }
+.item.done.lvl3, .item.done.lvl2 { border-color: var(--line); background: none; box-shadow: none; }
 .btn.aufb { font-size: 11.5px; padding: 1px 8px; }
 #aufD { max-width: min(440px, 92vw); }
 #aufD h3 { margin: 0 0 10px; }
@@ -1078,7 +1083,13 @@ window.tagesblickInit = function () {
     }
     var done = isDone(e);
     var side = opts.check && !e.hinweis ? '<input type="checkbox" id="chk-' + esc(e.id) + '" data-id="' + esc(e.id) + '"' + (priority && priority.stufe === 'akut' ? ' data-akut="1"' : '') + (done ? ' checked' : '') + ' aria-label="Erledigt: ' + esc(e.titel) + '">' : '';
-    return '<li class="item' + (done ? ' done' : '') + '" data-who="' + esc(e.wer) + '">' + when +
+    var lvl = '';
+    if (opts.check) {
+      var wp = priority && priority.stufe;
+      if (wicht(e) === 3 || (e.pill && /extrem/i.test(e.pill.text || ''))) lvl = ' lvl3';
+      else if (wicht(e) === 2 || wp === 'akut') lvl = ' lvl2';
+    }
+    return '<li class="item' + (done ? ' done' : '') + lvl + '" data-who="' + esc(e.wer) + '">' + when +
       '<div><div class="title">' + titled(e, e.titel) + '</div><div class="meta">' + meta + '</div>' +
       (e.warum ? '<div class="why">' + esc(e.warum) + '</div>' : '') + prep + '</div>' +
       '<div class="side">' + side + '</div></li>';
