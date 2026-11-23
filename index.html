@@ -507,6 +507,10 @@ select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
 /* Wichtigkeit sofort sichtbar: Kritisch / Extrem wichtig mit rotem Rahmen, Wichtig und lange Offenes mit Bronze-Balken */
 .item.lvl3 { border: 2px solid var(--akut); border-radius: 10px; padding: 10px 10px; margin: 8px 0; background: color-mix(in srgb, var(--akut) 10%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--akut) 16%, transparent); }
 .item.lvl3 .title { font-weight: 700; }
+/* Langsames Atmen (4 s, weich ein und aus), kein Blinken. Aus bei "Bewegung reduzieren". */
+@keyframes lvl3Atmen { 0%, 100% { border-color: color-mix(in srgb, var(--akut) 45%, transparent); background-color: color-mix(in srgb, var(--akut) 5%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--akut) 6%, transparent); } 50% { border-color: var(--akut); background-color: color-mix(in srgb, var(--akut) 15%, transparent); box-shadow: 0 0 14px 3px color-mix(in srgb, var(--akut) 32%, transparent); } }
+.item.lvl3:not(.done) { animation: lvl3Atmen 4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .item.lvl3:not(.done) { animation: none; } }
 .item.lvl2 { border: 0; border-left: 4px solid var(--bald); border-radius: 6px; padding: 8px 10px; margin: 4px 0; background: color-mix(in srgb, var(--bald) 8%, transparent); }
 .item.done.lvl3, .item.done.lvl2 { border-color: var(--line); background: none; box-shadow: none; }
 .btn.aufb { font-size: 11.5px; padding: 1px 8px; }
