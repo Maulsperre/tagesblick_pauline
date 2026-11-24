@@ -1059,8 +1059,10 @@ window.tagesblickInit = function () {
   var todayList = E.filter(function (e) { return !isAllDay(e) && (occurs(e, 0) || isUndatedTask(e)); });
   E.forEach(function (e) { if (e.datum && diff(e.datum) < 0 && !isDone(e) && OVERDUE.indexOf(e.art) >= 0) todayList.push(e); });
   E.forEach(function (e) { if (winInfo(e) && (winShown(e) || (isDone(e) && winInfo(e).state === 'in'))) todayList.push(e); });
+  /* Aufgaben ohne Uhrzeit (Anrufe, Behörden, Praxen) gehören in die Tageszeit bis 18 Uhr: sie stehen vor Abendterminen, nach früheren Terminen. */
+  function dayKey(e) { var m = /^(\d{1,2}):(\d{2})/.exec(e.zeit || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : 17 * 60 + 59; }
   todayList = todayList.filter(function (e, i, a) { return a.indexOf(e) === i && !doneEarlier(e); }).sort(function (a, b) {
-    return byTime(a, b) || (rang(a) - rang(b)) || Number(!!isUndatedTask(a)) - Number(!!isUndatedTask(b)) ||
+    return (dayKey(a) - dayKey(b)) || (rang(a) - rang(b)) || Number(!!isUndatedTask(a)) - Number(!!isUndatedTask(b)) ||
       (isUndatedTask(a) && isUndatedTask(b) ? (wicht(b) - wicht(a)) || taskAge(b) - taskAge(a) : 0);
   });
   var tomorrowList = E.filter(function (e) { return !isAllDay(e) && occurs(e, 1); }).sort(byTime);
@@ -1109,7 +1111,7 @@ window.tagesblickInit = function () {
   var OPENIDS = {}, BOXOPEN = {}, RESTN = 0, CAP = 8; /* höchstens 8 Aufgaben gleichzeitig sichtbar, der Rest ist eingeklappt */
   function item(e, opts) {
     var when = opts.count ? '<span class="when">' + diff(e.datum) + ' T</span>'
-      : e.zeit ? '<span class="when">' + esc(e.zeit) + '</span>' : '<span class="when none">––:––</span>';
+      : e.zeit ? '<span class="when">' + esc(e.zeit) + '</span>' : '<span class="when none">&nbsp;</span>';
     var overdue = opts.check && e.datum && diff(e.datum) < 0 ? '<span class="pill akut">überfällig seit ' + shortDate(diff(e.datum)) + '</span>' : '';
     var priority = entryPriority(e);
     var meta = '<span class="kind">' + esc(e.art) + '</span>' + who(e.wer) +
