@@ -542,6 +542,7 @@ select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
 .restwrap.donebox > details > summary { color: var(--ruhig); }
 .btn.aufb { font-size: 11.5px; padding: 1px 8px; }
 .btn.nzb { font-size: 11.5px; padding: 1px 8px; }
+.when.plan { color: var(--accent-2); font-style: italic; }
 #nzD { max-width: min(560px, 94vw); }
 #nzD h3 { margin: 4px 0 8px; }
 #aufD { max-width: min(440px, 92vw); }
@@ -1060,11 +1061,17 @@ window.tagesblickInit = function () {
   E.forEach(function (e) { if (e.datum && diff(e.datum) < 0 && !isDone(e) && OVERDUE.indexOf(e.art) >= 0) todayList.push(e); });
   E.forEach(function (e) { if (winInfo(e) && (winShown(e) || (isDone(e) && winInfo(e).state === 'in'))) todayList.push(e); });
   /* Aufgaben ohne Uhrzeit (Anrufe, Behörden, Praxen) gehören in die Tageszeit bis 18 Uhr: sie stehen vor Abendterminen, nach früheren Terminen. */
-  function dayKey(e) { var m = /^(\d{1,2}):(\d{2})/.exec(e.zeit || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : 17 * 60 + 59; }
-  todayList = todayList.filter(function (e, i, a) { return a.indexOf(e) === i && !doneEarlier(e); }).sort(function (a, b) {
+  function dayKey(e) { var q = PLAN[e.id], m = /^(\d{1,2}):(\d{2})/.exec(e.zeit || (q && q.datum === TODAY_ISO ? q.von : '') || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : 17 * 60 + 59; }
+  /* Plan: plan.json (von Claude geschrieben) ordnet Aufgaben Tagen und Uhrzeiten zu. PLAN[id] = {datum, von, bis, grund}. */
+  var PLAN = {};
+  function planHeute(e) { var q = PLAN[e.id]; return q && q.datum === TODAY_ISO ? q : null; }
+  function fest(e) { return !!(planHeute(e) || (e.zeit && e.datum && diff(e.datum) <= 0)); } /* fest eingeplant: Plan heute oder Termin mit Uhrzeit, heute oder überfällig */
+  function planSpaeter(e) { var q = PLAN[e.id]; return !!(q && q.datum > TODAY_ISO && !(e.datum && diff(e.datum) <= 0)); }
+  function todaySort(a, b) {
     return (dayKey(a) - dayKey(b)) || (rang(a) - rang(b)) || Number(!!isUndatedTask(a)) - Number(!!isUndatedTask(b)) ||
       (isUndatedTask(a) && isUndatedTask(b) ? (wicht(b) - wicht(a)) || taskAge(b) - taskAge(a) : 0);
-  });
+  }
+  todayList = todayList.filter(function (e, i, a) { return a.indexOf(e) === i && !doneEarlier(e); }).sort(function (a, b) { return todaySort(a, b); });
   var tomorrowList = E.filter(function (e) { return !isAllDay(e) && occurs(e, 1); }).sort(byTime);
   /* Wie eine Sekretärin: bis 14 Tage vorher steht alles hier, Dinge mit langem Vorlauf (Arzt, Schulung) ab ihrem Erinnerungstag. */
   var aheadList = E.filter(function (e) {
@@ -1111,12 +1118,14 @@ window.tagesblickInit = function () {
   var OPENIDS = {}, BOXOPEN = {}, RESTN = 0, CAP = 8; /* höchstens 8 Aufgaben gleichzeitig sichtbar, der Rest ist eingeklappt */
   function item(e, opts) {
     var when = opts.count ? '<span class="when">' + diff(e.datum) + ' T</span>'
-      : e.zeit ? '<span class="when">' + esc(e.zeit) + '</span>' : '<span class="when none">&nbsp;</span>';
+      : e.zeit ? '<span class="when">' + esc(e.zeit) + '</span>' : planHeute(e) && planHeute(e).von ? '<span class="when plan" title="Von Claude geplant">≈' + esc(planHeute(e).von) + '</span>' : '<span class="when none">&nbsp;</span>';
     var overdue = opts.check && e.datum && diff(e.datum) < 0 ? '<span class="pill akut">überfällig seit ' + shortDate(diff(e.datum)) + '</span>' : '';
     var priority = entryPriority(e);
     var meta = '<span class="kind">' + esc(e.art) + '</span>' + who(e.wer) +
       (opts.count ? abh(e) : (e.bereich ? '<span class="bereich">' + esc(e.bereich) + '</span>' : '') +
         (rang(e) < 99 ? '<span class="pill akut rang">Nr. ' + rang(e) + '</span>' : '') + (wicht(e) === 3 ? '<span class="pill akut">Kritisch</span>' : wicht(e) === 1 ? '<span class="pill info">Irgendwann</span>' : '') + abh(e) + pill(priority) + overdue);
+    var pq = opts.check ? PLAN[e.id] : null;
+    if (pq && pq.datum >= TODAY_ISO) meta += '<span class="pill info plan" title="' + esc(pq.grund || 'Von Claude geplant') + '">Geplant ' + (pq.datum === TODAY_ISO ? 'heute' : shortDate(diff(pq.datum))) + (pq.von ? ', ' + esc(pq.von) : '') + '</span>';
     var ctl = '';
     if (isUndatedTask(e)) {
       var wn = wdh(e);
@@ -1201,12 +1210,14 @@ window.tagesblickInit = function () {
   }
   function renderLists() {
     paintAttrs('heute', 0); paintAttrs('morgen', 1);
+    todayList.sort(todaySort);
     var vis = todayList.filter(function (e) { return !snoozed(e) && !ruht(e); });
     var isTask = function (e) { return OVERDUE.indexOf(e.art) >= 0 && !e.hinweis; };
     var dateKey = function (e) { return e.datum ? diff(e.datum) : 9999; };
-    var cmpPrio = function (a, b) { return (rang(a) - rang(b)) || (dateKey(a) - dateKey(b)) || (wicht(b) - wicht(a)) || ((isUndatedTask(b) ? taskAge(b) : 0) - (isUndatedTask(a) ? taskAge(a) : 0)); };
+    var cmpPrio = function (a, b) { return (Number(!fest(a)) - Number(!fest(b))) || (rang(a) - rang(b)) || (dateKey(a) - dateKey(b)) || (wicht(b) - wicht(a)) || ((isUndatedTask(b) ? taskAge(b) : 0) - (isUndatedTask(a) ? taskAge(a) : 0)); };
     var openTasks = vis.filter(function (e) { return isTask(e) && !isDone(e); }).sort(cmpPrio);
-    var shownT = openTasks.slice(0, CAP), restT = openTasks.slice(CAP);
+    var jetztT = openTasks.filter(function (e) { return !planSpaeter(e); }), spaeterT = openTasks.filter(planSpaeter);
+    var shownT = jetztT.slice(0, CAP), restT = jetztT.slice(CAP).concat(spaeterT);
     var doneL = vis.filter(function (e) { return isDone(e) && !e.hinweis; });
     var mainL = vis.filter(function (e) { return !isDone(e) && (!isTask(e) || shownT.indexOf(e) >= 0); });
     var box = function (key, cls, label, list) {
@@ -1265,6 +1276,24 @@ window.tagesblickInit = function () {
     else { if (val) doneSet[key] = val; else delete doneSet[key]; store('pauline-erledigt', doneSet); }
     updateOpen();
   });
+
+  /* Plan laden: plan.json lesen (OneDrive oder lokal), Aufgaben danach einordnen und neu zeichnen. */
+  (function () {
+    if (window.TB_VARIANT === 'pauline') return;
+    function lade() {
+      var io = window.TB_PLAN_IO;
+      var pr = io ? io.load() : fetch('plan.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.json(); });
+      pr.then(function (o) {
+        var m = {};
+        ((o && o.bloecke) || []).slice().sort(function (a, b) { return String(a.datum + (a.von || '')).localeCompare(String(b.datum + (b.von || ''))); }).forEach(function (b) {
+          if (b.aufgabe && b.datum >= TODAY_ISO && !m[b.aufgabe]) m[b.aufgabe] = b;
+        });
+        PLAN = m; renderLists(); updateOpen();
+      }).catch(function () {});
+    }
+    setTimeout(lade, 2500); setInterval(lade, 10 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) lade(); });
+  })();
 
   /* Notiz an Claude: Zusatzinfo oder Änderungswunsch zu einer Aufgabe (notizen.json). Claude arbeitet sie beim nächsten Lauf ein. */
   (function () {
@@ -3280,6 +3309,15 @@ window.tbDErr = function (c) {
         load: function () {
           return token().then(function (tok) {
             return fetch(url('report.json'), { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store' })
+              .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+          });
+        }
+      };
+      /* Plan: plan.json (von Claude geschrieben, die App liest nur) */
+      if (!V) window.TB_PLAN_IO = {
+        load: function () {
+          return token().then(function (tok) {
+            return fetch(url('plan.json'), { headers: { Authorization: 'Bearer ' + tok }, cache: 'no-store' })
               .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
           });
         }
