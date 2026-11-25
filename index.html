@@ -101,7 +101,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-2); 
 .wm .ers i { font-style: normal; }
 .wm i.ex { font-style: normal; margin-left: .04em; }
 html.v-pauline [data-id="post"], html.v-pauline [data-id="melden"], html.v-pauline #shopBtn, html.v-pauline #ideenBtn, html.v-pauline #bibBtn, html.v-pauline #repBtn, html.v-pauline #repD, html.v-pauline #rqD, html.v-pauline #nzD, html.v-pauline .nzb, html.v-pauline #bibO, html.v-pauline #bibR, html.v-pauline #lGmail, html.v-pauline #lKal,
-html.v-pauline #srcBtn, html.v-pauline #menuHelp, html.v-pauline #foot { display: none !important; }
+html.v-pauline #srcBtn, html.v-pauline #menuHelp, html.v-pauline #foot, html.v-pauline .nur-markus { display: none !important; }
 .wm .ers:last-of-type { margin-left: .14em; }
 .wm .alt { display: inline-block; transform: translateY(.36em) rotate(24deg); transform-origin: 50% 50%; opacity: .38; font-size: .9em; animation: wmfall 1.1s cubic-bezier(.45,0,.9,.55) .5s both; }
 .wm .ers:last-of-type .alt { animation-delay: .85s; }
@@ -883,6 +883,16 @@ html[data-theme="ueberraschung"] .editbtn:hover, html[data-theme="ueberraschung"
 
           <section class="rep"><h4>Ansicht anpassen</h4>
             <p><b>Radar/Zeitleiste</b> schaltet zwischen den zwei Ansichten der nächsten 14 Tage um. Mit <b>Design</b> wählst du Farben, Schrift und Schriftgröße. Mit dem Pfeil ↔ oben an jedem Feld machst du es breiter. Mit <b>Anordnen</b> verschiebst du die Felder. Links filterst du nach Person.</p>
+          </section>
+
+          <section class="rep nur-markus"><h4>🧩 Skill: Aufgabe eintragen</h4>
+            <p>Ein Skill ist ein fester Ablauf, den Claude auf Abruf nachschlägt. <b>tagesblick-aufgabe-eintragen</b> beschreibt, wie Claude eine Aufgabe oder einen Termin in <code>daten.js</code> einträgt: nächste freie Nummer, Wichtigkeit, Frist, kleinste Schritte, ein Feld <i>intern</i> nur für Claude, danach Gültigkeitsprüfung der Datei, bei Bedarf ein ⏰-Alarm im Google-Kalender und ein Platz im Tagesplan. Am Ende sagt Claude in ein bis drei Sätzen, was eingetragen ist und was noch fehlt.</p>
+            <p><b>So nutzt du ihn:</b> Schreib oder diktiere wie immer einen Zuruf, zum Beispiel <q>Erinnere mich morgen um 10 an das Aktien-Terminal.</q> Claude nimmt den Ablauf von selbst. Im Claude-Fenster am PC kannst du ihn mit <b>/tagesblick-aufgabe-eintragen</b> ausdrücklich aufrufen. Die Regeln selbst stehen weiter in <code>ANLEITUNG.md</code> und <code>ERINNERUNGEN.md</code>, der Skill verweist nur darauf.</p>
+          </section>
+
+          <section class="rep nur-markus"><h4>🧩 Skill: Veröffentlichen</h4>
+            <p><b>tagesblick-veroeffentlichen</b> ist der Ablauf, mit dem eine geänderte Seite online geht: Syntax und Vorschau prüfen, Paulines Fassung neu bauen, beide GitHub-Repositories aktualisieren und danach online nachsehen, dass dort wirklich die neue Version liegt. Er gilt nur für das Programm (<code>index.html</code>, <code>sw.js</code>, <code>manifest.json</code>, Symbole), nie für deine Daten.</p>
+            <p><b>So nutzt du ihn:</b> Du musst nichts tun. Nach einer Änderung, die du verlangt hast, läuft er nach der Prüfung in der Vorschau von selbst. Mit <b>/tagesblick-veroeffentlichen</b> kannst du ihn am PC auch selbst anstoßen. Dein Tablet holt die neue Seite beim nächsten Start, danach lädt sie Änderungen an <code>daten.js</code> von selbst nach.</p>
           </section>
 
           <section class="rep"><h4>Was ich nicht von selbst tue</h4>
