@@ -3456,6 +3456,25 @@ window.tbDErr = function (c) {
           }
         };
       }
+      /* Ändert Claude daten.js, während die Seite offen ist, lädt sich die Seite selbst neu, aber nur wenn gerade nichts bedient wird:
+         kein offener Dialog, kein Eingabefeld im Fokus, Bibliothek zu, letzte Berührung mindestens 20 Sekunden her. */
+      var wBasis = null, wLetzte = Date.now(), wLauf = false, wNeu = false;
+      ['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(function (ev) { document.addEventListener(ev, function () { wLetzte = Date.now(); }, true); });
+      function wRuhig() {
+        if (document.hidden || Date.now() - wLetzte < 20000) return false;
+        if (document.querySelector('dialog[open], #bibO.open, #bibR.open')) return false;
+        var a = document.activeElement;
+        if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return false;
+        return true;
+      }
+      function wPruefe() {
+        if (wNeu || wLauf || document.hidden || wBasis === null || !account) return;
+        wLauf = true;
+        token().then(function (tok) { return lade(tok, 0); }).then(function (t) { wLauf = false; if (t !== wBasis) wNeu = true; }).catch(function () { wLauf = false; });
+      }
+      setInterval(function () { if (wNeu && wRuhig()) location.reload(); }, 10000);
+      setInterval(wPruefe, 3 * 60 * 1000);
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) setTimeout(wPruefe, 1500); });
       app.initialize().then(function () { return app.handleRedirectPromise(); }).then(function (res) {
         account = (res && res.account) || app.getAllAccounts()[0];
         if (!account) { window.TB_ERL = mkErl(null, null, localMap()); return start(cached() || EMPTY, 'Noch nicht angemeldet.', 'Bei Microsoft anmelden', login); }
@@ -3467,7 +3486,7 @@ window.tbDErr = function (c) {
             });
           })
           .then(function (r) {
-            var d = parse(r[0]);
+            var d = parse(r[0]); wBasis = r[0];
             if (V) { if (!d.personen || !Object.keys(d.personen).length) d.personen = { pauline: { name: 'Pauline', farbe: 'var(--pauline)' } }; d.post = d.post || []; d.melden = d.melden || []; d.demo = false; }
             ls(CACHE, JSON.stringify(d));
             var m = r[1]; ls(LOCALERL, JSON.stringify(m));
