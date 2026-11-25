@@ -543,6 +543,7 @@ select.wdh:focus-visible { outline: 2px solid var(--accent-2); }
 .btn.aufb { font-size: 11.5px; padding: 1px 8px; }
 .btn.nzb { font-size: 11.5px; padding: 1px 8px; }
 .when.plan { color: var(--accent-2); font-style: italic; }
+.pill.nzp { white-space: normal; max-width: 100%; }
 #nzD { max-width: min(560px, 94vw); }
 #nzD h3 { margin: 4px 0 8px; }
 #aufD { max-width: min(440px, 92vw); }
@@ -1126,6 +1127,10 @@ window.tagesblickInit = function () {
         (rang(e) < 99 ? '<span class="pill akut rang">Nr. ' + rang(e) + '</span>' : '') + (wicht(e) === 3 ? '<span class="pill akut">Kritisch</span>' : wicht(e) === 1 ? '<span class="pill info">Irgendwann</span>' : '') + abh(e) + pill(priority) + overdue);
     var pq = opts.check ? PLAN[e.id] : null;
     if (pq && pq.datum >= TODAY_ISO) meta += '<span class="pill info plan" title="' + esc(pq.grund || 'Von Claude geplant') + '">Geplant ' + (pq.datum === TODAY_ISO ? 'heute' : shortDate(diff(pq.datum))) + (pq.von ? ', ' + esc(pq.von) : '') + '</span>';
+    if (opts.check && window.tbNotizen) window.tbNotizen(e.id).forEach(function (n) {
+      var t = String(n.text || ''), wartet = n.status !== 'verarbeitet';
+      meta += '<span class="pill info nzp" title="' + esc(t) + '">' + (wartet ? (n.lokal ? '📝 Notiz noch nicht gesendet: ' : '📝 Notiz wartet auf Claude: ') : '✓ Notiz von Claude eingearbeitet: ') + '„' + esc(t.length > 140 ? t.slice(0, 140) + '…' : t) + '“</span>';
+    });
     var ctl = '';
     if (isUndatedTask(e)) {
       var wn = wdh(e);
@@ -1307,8 +1312,27 @@ window.tagesblickInit = function () {
       io.apply(function (o) {
         var have = {}; o.notizen.forEach(function (x) { have[x.id] = 1; });
         q.forEach(function (x) { if (!have[x.id]) o.notizen.push(x); });
-      }).then(function () { putOps(ops().slice(q.length)); }).catch(function () {});
+      }).then(function () { putOps(ops().slice(q.length)); ladeNotizen(); }).catch(function () {});
     }
+    var NZ = [];
+    function ladeNotizen() {
+      var io = window.TB_NOTIZ_IO;
+      var pr = io && io.load ? io.load() : fetch('notizen.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.json(); });
+      pr.then(function (o) { NZ = (o && Array.isArray(o.notizen)) ? o.notizen : []; renderLists(); updateOpen(); }).catch(function () {});
+    }
+    /* Notizen zu einer Aufgabe, die Claude noch nicht abgeholt hat (oder in den letzten 24 Stunden eingearbeitet hat) */
+    window.tbNotizen = function (id) {
+      var have = {}, out = [], jetzt = Date.now();
+      NZ.forEach(function (n) {
+        have[n.id] = 1; if (n.aufgabe !== id) return;
+        if (n.status === 'verarbeitet') { var v = Date.parse(n.verarbeitet || n.zeit || ''); if (!(jetzt - v < 864e5)) return; }
+        out.push(n);
+      });
+      ops().forEach(function (n) { if (n.aufgabe === id && !have[n.id]) out.push({ id: n.id, text: n.text, zeit: n.zeit, status: 'neu', lokal: true }); });
+      return out.sort(function (a, b) { return String(a.zeit).localeCompare(String(b.zeit)); });
+    };
+    setTimeout(ladeNotizen, 3000); setInterval(ladeNotizen, 2 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) ladeNotizen(); });
     setInterval(flush, 30000); setTimeout(flush, 4500);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) flush(); });
     function stopMic() { if (rec) { try { rec.stop(); } catch (e) {} } }
@@ -1347,7 +1371,7 @@ window.tagesblickInit = function () {
       if (!t) { $('nzErr').textContent = 'Bitte schreib oder sprich etwas, oder wähle „Abbrechen“.'; return; }
       var q = ops(), z = new Date().toISOString();
       q.push({ id: 'n' + Date.now().toString(36), aufgabe: cur.id, aufgabeTitel: cur.titel, text: t.slice(0, 3000), zeit: z, status: 'neu' });
-      putOps(q); flush(); close();
+      putOps(q); flush(); close(); renderLists(); updateOpen();
       var btn = document.querySelector('.nzb[data-id="' + cur.id + '"]'); if (btn) { btn.textContent = '✓ Notiz gesendet'; setTimeout(function () { btn.textContent = '📝 Notiz an Claude'; }, 4000); }
     });
   })();
@@ -3352,6 +3376,7 @@ window.tbDErr = function (c) {
           .then(function (o) { if (!o || !Array.isArray(o.notizen)) o = { notizen: [] }; return o; });
       }
       if (!V) window.TB_NOTIZ_IO = {
+        load: function () { return token().then(ladeNz); },
         apply: function (fn) {
           var p = nzLauf.then(function () {
             return token().then(function (tok) {
