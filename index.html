@@ -2771,9 +2771,18 @@ window.tagesblickInit = function () {
   }
 
   /* Lesen: Das Buch bekommt ein kleines Skript, das die Position meldet und beim Öffnen wiederherstellt. */
-  function inject(html, pos) {
-    var s = '<script>(function(){var P=' + (+pos || 0) + ',se=function(){return document.scrollingElement||document.documentElement},mx=function(){var e=se();return Math.max(1,e.scrollHeight-e.clientHeight)};' +
-      'function go(){if(P>0)se().scrollTop=P*mx()}addEventListener("load",function(){go();setTimeout(go,300);setTimeout(go,1200)});' +
+  function inject(html, pos, hash) {
+    /* Das Buch läuft abgeschottet im iframe: Sprungmarken (#…) und Links auf andere Kapitel funktionieren dort nicht von selbst.
+       Darum fängt das Skript Klicks ab: #-Links scrollen im Buch, Links auf andere Dateien der Bibliothek öffnen das Kapitel in der App, http(s) geht in einen neuen Tab. */
+    var H = JSON.stringify(String(hash || '').replace(/[<>]/g, ''));
+    var s = '<script>(function(){var P=' + (+pos || 0) + ',H=' + H + ',se=function(){return document.scrollingElement||document.documentElement},mx=function(){var e=se();return Math.max(1,e.scrollHeight-e.clientHeight)};' +
+      'function find(i){return document.getElementById(i)||document.getElementsByName(i)[0]}' +
+      'function go(){if(H){var t=find(H);if(t){t.scrollIntoView();return}}if(P>0)se().scrollTop=P*mx()}addEventListener("load",function(){go();setTimeout(go,300);setTimeout(go,1200)});' +
+      'document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented)return;var h=a.getAttribute("href")||"";' +
+      'if(h.charAt(0)==="#"){e.preventDefault();var i=h.slice(1);try{i=decodeURIComponent(i)}catch(x){}var t=i?find(i):null;if(t)t.scrollIntoView();else if(!i||i==="top")scrollTo(0,0);return}' +
+      'if(/^https?:/i.test(h)){e.preventDefault();window.open(h,"_blank","noopener");return}' +
+      'if(/^[a-z][a-z0-9+.-]*:/i.test(h)||h.slice(0,2)==="//")return;' +
+      'e.preventDefault();var k=h.indexOf("#");parent.postMessage({tbBib:2,file:k<0?h:h.slice(0,k),hash:k<0?"":h.slice(k+1)},"*")});' +
       'var t,ok=false;setTimeout(function(){ok=true},1500);function send(){parent.postMessage({tbBib:1,pos:se().scrollTop/mx()},"*")}' +
       'addEventListener("scroll",function(){if(!ok)return;clearTimeout(t);t=setTimeout(send,500)},{passive:true});addEventListener("pagehide",function(){if(ok)send()});})();<\/script>';
     var i = html.toLowerCase().lastIndexOf('</body>');
@@ -2794,12 +2803,12 @@ window.tagesblickInit = function () {
     });
   }
   function siblings(b) { return ALL.filter(function (x) { return x.src === b.src && x.bib === b.bib && x.kat === b.kat && x.thema === b.thema; }).sort(function (a, c) { return String(a.kapNr || '').localeCompare(String(c.kapNr || '')); }); }
-  function openBook(id, push) {
+  function openBook(id, push, hash) {
     var b = ALL.filter(function (x) { return x.id === id; })[0]; if (!b) return;
     $('bibLoad').classList.add('open');
     loadBook(b).then(function (buf) {
       var pos = (ZU.buecher[b.name] || {}).pos || 0;
-      var html = inject(new TextDecoder('utf-8').decode(buf), pos >= 0.95 ? 0 : pos);
+      var html = inject(new TextDecoder('utf-8').decode(buf), pos >= 0.95 ? 0 : pos, hash);
       if (blobUrl) URL.revokeObjectURL(blobUrl);
       blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
       current = b;
@@ -2823,9 +2832,20 @@ window.tagesblickInit = function () {
     if (dirty) pushLater(true);
   }
   function step(d) { if (!current) return; var sib = siblings(current), i = sib.indexOf(current); if (sib[i + d]) { history.replaceState({ bib: 'book' }, '', '#lesen'); openBook(sib[i + d].id, false); } }
+  /* Link im Buch auf eine andere Datei: das passende Kapitel oder Buch der Bibliothek öffnen (gleicher Dateiname), sonst Hinweis */
+  function openLinked(file, hash) {
+    var name = file; try { name = decodeURIComponent(file); } catch (e) {}
+    name = name.split('/').pop().split('\\').pop().toLowerCase();
+    if (!name) return;
+    var b = ALL.filter(function (x) { return x.name.toLowerCase() === name; })[0];
+    if (!b) { window.alert('„' + name + '“ liegt nicht in der Bibliothek.'); return; }
+    history.replaceState({ bib: 'book' }, '', '#lesen'); openBook(b.id, false, hash);
+  }
   window.addEventListener('message', function (ev) {
     var d = ev.data;
-    if (!current || ev.source !== $('bibF').contentWindow || !d || d.tbBib !== 1 || typeof d.pos !== 'number' || !isFinite(d.pos)) return;
+    if (!current || ev.source !== $('bibF').contentWindow || !d) return;
+    if (d.tbBib === 2 && typeof d.file === 'string') { openLinked(d.file, typeof d.hash === 'string' ? d.hash : ''); return; }
+    if (d.tbBib !== 1 || typeof d.pos !== 'number' || !isFinite(d.pos)) return;
     setPos(d.pos);
   });
 
